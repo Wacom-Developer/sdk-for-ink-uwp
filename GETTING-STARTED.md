@@ -2,8 +2,8 @@
 
 ## Windows 10 UWP Development Environment
 
-The WILL SDK for Ink requires Windows 10 with Visual Studio 2017 or above.
-Tutorial samples have been provided for the Universal Windows Platform (UWP).
+The WILL SDK for Ink requires Windows 10 with Visual Studio 2019 or above.
+A sample application has been provided for the Universal Windows Platform (UWP).
 
 ## Download the SDK
 
@@ -11,10 +11,10 @@ Download the SDK from https://developer.wacom.com/developer-dashboard
 
 * Login using your Wacom ID
 * Select **Downloads for ink**
-* Download **WILL SDK for Windows 10 (UWP)**
+* Download **WILL 3 SDK for ink - Windows**
 * Accept the End User License Agreement to use the SDK
 
-The downloaded Zip file contains the SDK with documentation.
+The downloaded Zip file contains the SDK.
 
 
 ## SDK License
@@ -23,66 +23,50 @@ The SDK is free of charge and does not need a license.
 
 ## Using the WILL SDK
 
-To use the SDK first install the Visual Studio .vsix extension:
+The SDK contains the NuGet packages required by the application code.
+> Ultimately the packages will be available in the public NuGet.org Gallery provided for the .NET community.
+> Until they are in place the same result can be achieved by using a local copy:
 
-    Sdk\Will.Ink.vsix
-
-Double-click in File Explorer and follow the installation instructions.
+•	copy the SDK *NuGets* folder alongside the sample project code
+•	follow the instructions below to add the NugGet packages to the project references
     
-
-## Tutorials
-
-Tutorials demonstrate how to use WILL SDK in Windows Store applications. 
-The tutorials are divided into parts that demonstrate various aspects and features of the SDK. 
-The following tutorials are provided:
-
-* [Tutorial 1: Drawing with Pointing Devices](Samples/Tutorials/Tutorial_01/README.md)
-* [Tutorial 2: Stroke Model and Serialization](Samples/Tutorials/Tutorial_02/README.md)
-* [Tutorial 3: Erasing Strokes](Samples/Tutorials/Tutorial_03/README.md)
-* [Tutorial 4: Selecting Strokes](Samples/Tutorials/Tutorial_04/README.md)
-* [Tutorial 5: Working with Rasters](Samples/Tutorials/Tutorial_05/README.md)
-* [Tutorial 6: Pen Id](Samples/Tutorials/Tutorial_06/README.md)
-
-The sample code in the tutorials is written in C#. 
-Each tutorial has an associated project which can be compiled and run using Visual Studio 2013.
-
-The projects are created with Visual Studio 2013 using the following template in the New Project dialog:
-
-```Templates > Visual C# > Store Apps > Windows Apps > Blank App (Windows)```
-
-
-## API Reference
-
-In the downloaded SDK open this file in a browser:
-
-`documentation\index.html`
-
-The page gives access to the API Reference section:
-
-![WILL-Ink-API](media/API.png)
-
----
 
 ## Sample Application
 
-Build the supplied project in Visual Studio.
-These instructions document one experience using Visual Studio 2017:
+Build the application in Visual Studio 2019.
 
-* In Visual Studio 2017, Open Solution… Samples\DirectXInterop1.sln  
-* If prompted, install C++ Universal Windows Platform tools
-* If prompted, select 'Retarget Solution' in Solution Explorer and accept the default Windows SDK versions
-* Verify the References defined in the project are valid, particularly WILL Ink.
-* If the reference to WILL Ink is an older version:
-    * Remove the existing reference
-    * Add reference...Universal Windows...Extensions...WILL Ink 2.1
-* Select CPU type x64
-* Set DirectXInterop1 as the startup project: right-click the project in Solution Explorer ... Set as Startup Project
-* Build project
-* Run to display the startup window.
-* Draw with the mouse to see live rendering:
+- open the demo application WILL3-DemoApp-UWP.sln solution file
+- if prompted, select Developer Mode in Visual Studio
+- to compile the application you will need to add the NuGet packages to the project. One way is as follows:
+    - copy the sdk folder containing NuGet packages to a local folder
+      e.g. *WILL NuGets* 
+    - right-click the project in Solution Explorer
+    - Select *Manage NuGet Packages...* 
+      Wacom packages may be listed as unavailable. To resolve:
+    - Select Settings (gear wheel) - displays the Options dialog
+    - Select New (+)
+    - this will set new source Name: to 'Package Source' by default.
+      Change to *Wacom*
+    - click the browse button ...
+    - navigate to the *WILL NuGets* folder
+    - click Update
+    - on return to NuGet Package Manager change Package Source: to the newly created source folder (e.g. *Wacom*)
+      Wacom packages should now be shown as available (if necessary select Install):
+        Wacom.Ink
+        Wacom.Ink.Rendering.UWP
 
-![WILL-Ink-Sample-Screenshot](media/DirectXInterop1.png)
+- build the project as Debug x86 or Debug x64
+- run the program to display the main window
+- by selecting different options in the menu, the rendering options can be explored.
+- Options are included to clear the display and to save, or read a WILL Universal ink file
 
+
+
+![Demo app screenshot](media/will3-demo-uwp.png)
+
+## API Reference
+
+Having installed the NuGet packages the API can be viewed through IntelliSense or Object Browser in Visual Studio.
 
 ----
 
