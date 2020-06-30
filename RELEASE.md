@@ -1,4 +1,4 @@
-# SDK for ink - Windows UWP
+# WILL SDK for ink - Windows UWP
 
 ## Version 3.0.5
 
