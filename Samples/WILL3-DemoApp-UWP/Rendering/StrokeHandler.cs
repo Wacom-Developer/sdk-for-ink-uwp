@@ -22,6 +22,15 @@ namespace Wacom
     /// </summary>
     public abstract class StrokeHandler : IDisposable
     {
+        [Flags]
+        public enum SelectionMode 
+        {
+            Manipulate  = 0x01,
+            Erase       = 0x02,
+            Part        = 0x10,
+            Whole       = 0x20
+        }
+
         #region Fields
 
         protected Serializer mSerializer = new Serializer();
@@ -67,7 +76,7 @@ namespace Wacom
         /// </summary>
         public abstract void ClearStrokes();
 
-        public abstract void StartSelectionMode();
+        public abstract void StartSelectionMode(SelectionMode mode);
         public abstract void StopSelectionMode();
 
 

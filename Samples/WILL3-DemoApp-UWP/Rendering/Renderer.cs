@@ -33,9 +33,8 @@ namespace Wacom
 
         #region Fields
 
-        private SwapChainPanel m_swapChainPanel;
-        private PointerManager m_pointerManager;
-        private Graphics m_graphics = new Graphics();
+        private SwapChainPanel mSwapChainPanel;
+        private PointerManager mPointerManager;
 
         #endregion
 
@@ -43,7 +42,7 @@ namespace Wacom
 
         public StrokeHandler StrokeHandler { get; private set; }
 
-        public Graphics Graphics => m_graphics;
+        public Graphics Graphics { get; } = new Graphics();
 
         public DirtyRectManager DirtyRectManager { get; private set; } = new DirtyRectManager();
 
@@ -75,18 +74,18 @@ namespace Wacom
         {
             StrokeHandler = new VectorStrokeHandler(this, style, color);
 
-            m_swapChainPanel = swapChainPanel;
-            m_graphics.GraphicsReady += OnGraphicsReady;
-            m_graphics.Initialize(m_swapChainPanel, false);
+            mSwapChainPanel = swapChainPanel;
+            Graphics.GraphicsReady += OnGraphicsReady;
+            Graphics.Initialize(mSwapChainPanel, false);
         }
 
         public Renderer(SwapChainPanel swapChainPanel, RasterBrushStyle style, MediaColor color)
         {
-            StrokeHandler = new RasterStrokeHandler(this, style, color, m_graphics);
+            StrokeHandler = new RasterStrokeHandler(this, style, color, Graphics);
 
-            m_swapChainPanel = swapChainPanel;
-            m_graphics.GraphicsReady += OnGraphicsReady;
-            m_graphics.Initialize(m_swapChainPanel, false);
+            mSwapChainPanel = swapChainPanel;
+            Graphics.GraphicsReady += OnGraphicsReady;
+            Graphics.Initialize(mSwapChainPanel, false);
         }
 
         #endregion
@@ -98,10 +97,10 @@ namespace Wacom
         /// </summary>
         public void StartProcessingInput()
         {
-            m_swapChainPanel.PointerPressed += OnPointerPressed;
-            m_swapChainPanel.PointerMoved += OnPointerMoved;
-            m_swapChainPanel.PointerReleased += OnPointerReleased;
-            m_swapChainPanel.SizeChanged += OnSizeChanged;
+            mSwapChainPanel.PointerPressed += OnPointerPressed;
+            mSwapChainPanel.PointerMoved += OnPointerMoved;
+            mSwapChainPanel.PointerReleased += OnPointerReleased;
+            mSwapChainPanel.SizeChanged += OnSizeChanged;
         }
 
         /// <summary>
@@ -109,10 +108,10 @@ namespace Wacom
         /// </summary>
         public void StopProcessingInput()
         {
-            m_swapChainPanel.PointerPressed -= OnPointerPressed;
-            m_swapChainPanel.PointerMoved -= OnPointerMoved;
-            m_swapChainPanel.PointerReleased -= OnPointerReleased;
-            m_swapChainPanel.SizeChanged -= OnSizeChanged;
+            mSwapChainPanel.PointerPressed -= OnPointerPressed;
+            mSwapChainPanel.PointerMoved -= OnPointerMoved;
+            mSwapChainPanel.PointerReleased -= OnPointerReleased;
+            mSwapChainPanel.SizeChanged -= OnSizeChanged;
         }
 
         /// <summary>
@@ -122,7 +121,7 @@ namespace Wacom
         {
             StrokeHandler.DoGraphicsReady();
 
-            RenderingContext = m_graphics.GetRenderingContext();
+            RenderingContext = Graphics.GetRenderingContext();
 
             CreateLayers();
             ClearLayers();
@@ -137,12 +136,12 @@ namespace Wacom
         private void OnPointerPressed(object sender, PointerRoutedEventArgs args)
         {
             // If currently there is an unfinished stroke - do not interrupt it
-            if (!m_pointerManager.OnPressed(args))
+            if (!mPointerManager.OnPressed(args))
                 return;
 
-            m_swapChainPanel.CapturePointer(args.Pointer);
+            mSwapChainPanel.CapturePointer(args.Pointer);
 
-            StrokeHandler.OnPressed(m_swapChainPanel, args);
+            StrokeHandler.OnPressed(mSwapChainPanel, args);
         }
 
         /// <summary>
@@ -151,10 +150,10 @@ namespace Wacom
         private void OnPointerMoved(object sender, PointerRoutedEventArgs args)
         {
             // Ignore events from other pointers
-            if (!m_pointerManager.OnMoved(args))
+            if (!mPointerManager.OnMoved(args))
                 return;
 
-            StrokeHandler.OnMoved(m_swapChainPanel, args);
+            StrokeHandler.OnMoved(mSwapChainPanel, args);
         }
 
         /// <summary>
@@ -163,12 +162,12 @@ namespace Wacom
         private void OnPointerReleased(object sender, PointerRoutedEventArgs args)
         {
             // Ignore events from other pointers
-            if (!m_pointerManager.OnReleased(args))
+            if (!mPointerManager.OnReleased(args))
                 return;
 
-            m_swapChainPanel.ReleasePointerCapture(args.Pointer);
+            mSwapChainPanel.ReleasePointerCapture(args.Pointer);
 
-            StrokeHandler.OnReleased(m_swapChainPanel, args);
+            StrokeHandler.OnReleased(mSwapChainPanel, args);
 
             if (!StrokeHandler.IsSelecting)
             {
@@ -179,7 +178,7 @@ namespace Wacom
                 RenderBackbuffer();
                 PresentGraphics();
 
-                var ptrDevice = args.GetCurrentPoint(m_swapChainPanel).PointerDevice;
+                var ptrDevice = args.GetCurrentPoint(mSwapChainPanel).PointerDevice;
                 StrokeHandler.StoreCurrentStroke(ptrDevice.PointerDeviceType);
             }
         }
@@ -205,7 +204,7 @@ namespace Wacom
 
             DisposeLayers();
 
-            m_graphics.SetLogicalSize(e.NewSize);
+            Graphics.SetLogicalSize(e.NewSize);
 
             CreateLayers();
             ClearLayers();
@@ -265,7 +264,7 @@ namespace Wacom
             }
             else
             {
-                StrokeHandler = new RasterStrokeHandler(this, brushStyle, brushColor, m_graphics);
+                StrokeHandler = new RasterStrokeHandler(this, brushStyle, brushColor, Graphics);
                 StrokeHandler.DoGraphicsReady();
                 ClearLayers();
                 PresentGraphics();
@@ -274,12 +273,22 @@ namespace Wacom
 
         public void PresentGraphics()
         {
-            m_graphics.Present();
+            Graphics.Present();
         }
-       
+
+        public void InvokeRedrawAllStrokes()
+        {
+            var ignored = mSwapChainPanel.Dispatcher.RunAsync(CoreDispatcherPriority.High, () =>
+            {
+                ClearLayers();
+                TranslationLayerPainted = false;
+                RedrawAllStrokes(null, null);
+            });
+        }
+
         public void InvokeRenderSelected(List<Identifier> selectedStrokes)
         {
-            var ignored = m_swapChainPanel.Dispatcher.RunAsync(CoreDispatcherPriority.High, () =>
+            var ignored = mSwapChainPanel.Dispatcher.RunAsync(CoreDispatcherPriority.High, () =>
             {
                 ClearLayers();
                 RenderSelectedStrokes(selectedStrokes);
@@ -393,9 +402,9 @@ namespace Wacom
 
         public bool IsSelecting => StrokeHandler.IsSelecting;
 
-        public void StartSelectionMode()
+        public void StartSelectionMode(StrokeHandler.SelectionMode mode)
         {
-            StrokeHandler.StartSelectionMode();
+            StrokeHandler.StartSelectionMode(mode);
         }
         public void StopSelectionMode()
         {
@@ -410,15 +419,15 @@ namespace Wacom
         /// </summary>
         public void CreateLayers()
         {
-            Size size = m_graphics.Size;
-            float scale = m_graphics.Scale;
+            Size size = Graphics.Size;
+            float scale = Graphics.Scale;
 
-            BackBufferLayer = m_graphics.CreateBackbufferLayer();
-            SceneLayer = m_graphics.CreateLayer(size, scale);
-            AllStrokesLayer = m_graphics.CreateLayer(size, scale);
-            PrelimPathLayer = m_graphics.CreateLayer(size, scale);
-            CurrentStrokeLayer = m_graphics.CreateLayer(size, scale);
-            TranslationLayer = m_graphics.CreateLayer(size, scale);
+            BackBufferLayer = Graphics.CreateBackbufferLayer();
+            SceneLayer = Graphics.CreateLayer(size, scale);
+            AllStrokesLayer = Graphics.CreateLayer(size, scale);
+            PrelimPathLayer = Graphics.CreateLayer(size, scale);
+            CurrentStrokeLayer = Graphics.CreateLayer(size, scale);
+            TranslationLayer = Graphics.CreateLayer(size, scale);
         }
 
         /// <summary>
@@ -470,7 +479,7 @@ namespace Wacom
 
             StrokeHandler.Dispose();
 
-            Utils.SafeDispose(m_graphics);
+            Utils.SafeDispose(Graphics);
         }
 
         #endregion

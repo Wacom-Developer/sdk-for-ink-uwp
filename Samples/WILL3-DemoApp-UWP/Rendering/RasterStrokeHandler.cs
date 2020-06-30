@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices.WindowsRuntime;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Windows.Devices.Input;
 using Windows.Foundation;
@@ -28,23 +28,23 @@ namespace Wacom
         /// <summary>
         /// InkBuilder handling pipeline stages for building raster ink 
         /// </summary>
-        private RasterInkBuilder RasterInkBuilder => ActiveTool.InkBuilder;
+        private RasterInkBuilder RasterInkBuilder => mActiveTool.InkBuilder;
 
         /// <summary>
         /// List of completed strokes
         /// </summary>
-        private List<RasterInkStroke> m_dryStrokes = new List<RasterInkStroke>();
+        private List<RasterInkStroke> mDryStrokes = new List<RasterInkStroke>();
 
-        private Graphics m_graphics;
-        private uint m_startRandomSeed;
+        private Graphics mGraphics;
+        private uint mStartRandomSeed;
         private Random mRand = new Random();
-        private DrawStrokeResult m_drawStrokeResult;
-        private ParticleList m_addedInterpolatedSpline;
-        private ParticleList m_predictedInterpolatedSpline;
+        private DrawStrokeResult mDrawStrokeResult;
+        private ParticleList mAddedInterpolatedSpline;
+        private ParticleList mPredictedInterpolatedSpline;
         private RasterBrushStyle mBrushStyle;
         private StrokeConstants mStrokeConstants = new StrokeConstants();
 
-        private RasterDrawingTool ActiveTool = null;
+        private RasterDrawingTool mActiveTool = null;
 
 
         #endregion
@@ -68,7 +68,7 @@ namespace Wacom
         public RasterStrokeHandler(Renderer renderer, RasterBrushStyle brushStyle, MediaColor color, Graphics graphics)
           : base(renderer, color)
         {
-            m_graphics = graphics;
+            mGraphics = graphics;
             mBrushStyle = brushStyle;
         }
 
@@ -78,7 +78,7 @@ namespace Wacom
 
         public override void Dispose()
         {
-            m_dryStrokes.Clear();
+            mDryStrokes.Clear();
             Utils.SafeDispose(mStrokeConstants);
         }
 
@@ -94,45 +94,32 @@ namespace Wacom
 
         public override void OnPressed(UIElement uiElement, PointerRoutedEventArgs args)
         {
-            m_startRandomSeed = (uint)mRand.Next();
+            mStartRandomSeed = (uint)mRand.Next();
             base.OnPressed(uiElement, args);
-            ActiveTool.OnPressed(uiElement, args);
+            mActiveTool.OnPressed(uiElement, args);
         }
         public override void OnMoved(UIElement uiElement, PointerRoutedEventArgs args)
         {
-            ActiveTool.OnMoved(uiElement, args);
+            mActiveTool.OnMoved(uiElement, args);
         }
         public override void OnReleased(UIElement uiElement, PointerRoutedEventArgs args)
         {
-            ActiveTool.OnReleased(uiElement, args);
+            mActiveTool.OnReleased(uiElement, args);
         }
 
         public override void SetupStrokeTool(Windows.Devices.Input.PointerDevice device)
         {
-            (PathPointLayout, Calculator) layoutAndCalc;
+            PathPointLayout layout = mActiveTool.GetLayout(device.PointerDeviceType);
+            Calculator calculator = mActiveTool.GetCalculator(device.PointerDeviceType);
 
-            switch (device.PointerDeviceType)
-            {
-                case Windows.Devices.Input.PointerDeviceType.Mouse:
-                case Windows.Devices.Input.PointerDeviceType.Touch:
-                    layoutAndCalc = ActiveTool.GetLayoutAndCalulatorForMouse();
-                    break;
-
-                case Windows.Devices.Input.PointerDeviceType.Pen:
-                    layoutAndCalc = ActiveTool.GetLayoutAndCalulatorForStylus();
-                    break;
-
-                default:
-                    throw new Exception("Unknown input device type");
-            }
-            RasterInkBuilder.UpdatePipeline(layoutAndCalc.Item1, layoutAndCalc.Item2, ActiveTool.ParticleSpacing);
+            RasterInkBuilder.UpdatePipeline(layout, calculator, mActiveTool.ParticleSpacing);
         }
 
         public override bool IsSelecting => false;
 
         public override IEnumerable<Identifier> SelectedStrokes => null;
 
-        public override void StartSelectionMode()
+        public override void StartSelectionMode(SelectionMode mode)
         {
             throw new NotImplementedException("Raster ink manipulation is not supported");
         }
@@ -149,7 +136,7 @@ namespace Wacom
         public override void DoRenderStroke(RenderingContext renderingContext, object o, bool translationLayerPainted)
         {
             RasterInkStroke stroke = (RasterInkStroke)o;
-            renderingContext.DrawParticleStroke(stroke.Path, stroke.StrokeConstants, ActiveTool.Brush, Ink.Rendering.BlendMode.SourceOver, stroke.RandomSeed);
+            renderingContext.DrawParticleStroke(stroke.Path, stroke.StrokeConstants, mActiveTool.Brush, Ink.Rendering.BlendMode.SourceOver, stroke.RandomSeed);
         }
 
         /// <summary>
@@ -157,7 +144,7 @@ namespace Wacom
         /// </summary>
         public override void ClearStrokes()
         {
-            m_dryStrokes.Clear();
+            mDryStrokes.Clear();
             mSerializer = new Serializer();
         }
 
@@ -183,11 +170,11 @@ namespace Wacom
                     var dryStroke = new RasterInkStroke(RasterInkBuilder,
                         deviceType,
                         points,
-                        m_startRandomSeed,
+                        mStartRandomSeed,
                         CreateSerializationBrush($"will://examples/brushes/{Guid.NewGuid().ToString()}"),
                         mStrokeConstants.Clone(),
                         mSerializer.AddSensorData(deviceType, InkBuilder.GetPointerDataList()));
-                    m_dryStrokes.Add(dryStroke);
+                    mDryStrokes.Add(dryStroke);
                 }
             }
         }
@@ -195,7 +182,7 @@ namespace Wacom
         public override InkModel Serialize()
         {
             mSerializer.Init();
-            foreach (var stroke in m_dryStrokes)
+            foreach (var stroke in mDryStrokes)
             {
                 mSerializer.EncodeStroke(stroke);
             }
@@ -204,7 +191,7 @@ namespace Wacom
 
         public override void RenderAllStrokes(RenderingContext context, IEnumerable<Identifier> excluded, Rect? clipRect)
         {
-            foreach (var stroke in m_dryStrokes)
+            foreach (var stroke in mDryStrokes)
             {
                 // Draw current stroke
                 context.SetTarget(mRenderer.CurrentStrokeLayer);
@@ -228,25 +215,27 @@ namespace Wacom
         /// <param name="updateRect">returns bounding rectangle of area requiring update</param>
         public override void DoRenderNewStrokeSegment(out Rect updateRect)
         {
-            var result = ActiveTool.Path;
+            var result = mActiveTool.Path;
 
-            m_addedInterpolatedSpline.Assign(result.Addition);
-            m_predictedInterpolatedSpline.Assign(result.Prediction);
+            uint channelMask = (uint)RasterInkBuilder.SplineInterpolator.InterpolatedSplineLayout.ChannelMask;
+
+            mAddedInterpolatedSpline.Assign(result.Addition, channelMask);
+            mPredictedInterpolatedSpline.Assign(result.Prediction, channelMask);
 
             // Draw the added stroke
             mRenderer.RenderingContext.SetTarget(mRenderer.CurrentStrokeLayer);
-            m_drawStrokeResult = mRenderer.RenderingContext.DrawParticleStroke(m_addedInterpolatedSpline, mStrokeConstants, ActiveTool.Brush, Ink.Rendering.BlendMode.SourceOver, m_drawStrokeResult.RandomGeneratorSeed);
+            mDrawStrokeResult = mRenderer.RenderingContext.DrawParticleStroke(mAddedInterpolatedSpline, mStrokeConstants, mActiveTool.Brush, Ink.Rendering.BlendMode.SourceOver, mDrawStrokeResult.RandomGeneratorSeed);
 
             // Measure the predicted stroke
-            Rect predictedStrokeRect = mRenderer.RenderingContext.MeasureParticleStrokeBounds(m_predictedInterpolatedSpline, mStrokeConstants, ActiveTool.Brush.Scattering);
+            Rect predictedStrokeRect = mRenderer.RenderingContext.MeasureParticleStrokeBounds(mPredictedInterpolatedSpline, mStrokeConstants, mActiveTool.Brush.Scattering);
 
             // Calculate the update rect for this frame
-            updateRect = mRenderer.DirtyRectManager.GetUpdateRect(m_drawStrokeResult.DirtyRect, predictedStrokeRect);
+            updateRect = mRenderer.DirtyRectManager.GetUpdateRect(mDrawStrokeResult.DirtyRect, predictedStrokeRect);
 
             // Draw the predicted stroke
             mRenderer.RenderingContext.SetTarget(mRenderer.PrelimPathLayer);
             mRenderer.RenderingContext.DrawLayerAtPoint(mRenderer.CurrentStrokeLayer, updateRect, new Point(updateRect.X, updateRect.Y), Ink.Rendering.BlendMode.Copy);
-            mRenderer.RenderingContext.DrawParticleStroke(m_predictedInterpolatedSpline, mStrokeConstants, ActiveTool.Brush, Ink.Rendering.BlendMode.SourceOver, m_drawStrokeResult.RandomGeneratorSeed);
+            mRenderer.RenderingContext.DrawParticleStroke(mPredictedInterpolatedSpline, mStrokeConstants, mActiveTool.Brush, Ink.Rendering.BlendMode.SourceOver, mDrawStrokeResult.RandomGeneratorSeed);
         }
 
         /// <summary>
@@ -255,15 +244,12 @@ namespace Wacom
         public override void DoGraphicsReady()
         {
             CreateBrush(mBrushStyle);
-            RasterInkBuilder.LayoutUpdated += InkBuilder_LayoutUpdated;
         }
 
         private void InkBuilder_LayoutUpdated(object sender, EventArgs e)
         {
-            uint channelMask = (uint)RasterInkBuilder.SplineInterpolator.InterpolatedSplineLayout.ChannelMask;
-
-            m_addedInterpolatedSpline = new ParticleList(channelMask);
-            m_predictedInterpolatedSpline = new ParticleList(channelMask);
+            mAddedInterpolatedSpline = new ParticleList();
+            mPredictedInterpolatedSpline = new ParticleList();
         }
 
         /// <summary>
@@ -273,7 +259,7 @@ namespace Wacom
         public override void LoadInk(InkModel inkDocument)
         {
             base.LoadInk(inkDocument);
-            m_dryStrokes = new List<RasterInkStroke>(RecreateDryStrokes(inkDocument));
+            mDryStrokes = new List<RasterInkStroke>(RecreateDryStrokes(inkDocument));
         }
 
         #endregion
@@ -282,7 +268,7 @@ namespace Wacom
 
         private void CreateBrush(RasterBrushStyle brushStyle)
         {
-            SetBrushStyle(brushStyle, m_graphics);
+            SetBrushStyle(brushStyle, mGraphics);
             mBrushStyle = brushStyle;
         }
 
@@ -292,18 +278,20 @@ namespace Wacom
             switch (mBrushStyle = brushStyle)
             {
                 case RasterBrushStyle.Pencil:
-                    ActiveTool = new PencilTool(graphics);
+                    mActiveTool = new PencilTool(graphics);
                     break;
                 case RasterBrushStyle.WaterBrush:
-                    ActiveTool = new WaterBrushTool(graphics);
+                    mActiveTool = new WaterBrushTool(graphics);
                     break;
                 case RasterBrushStyle.Crayon:
-                    ActiveTool = new CrayonTool(graphics);
+                    mActiveTool = new CrayonTool(graphics);
                     break;
                 default:
                     throw new Exception("Unknown brush type");
             }
-            ActiveTool.PointsAdded += OnPointsAdded;
+            Trace.WriteLine($"WILL3 New ActiveTool {brushStyle}");
+            mActiveTool.PointsAdded += OnPointsAdded;
+            RasterInkBuilder.LayoutUpdated += InkBuilder_LayoutUpdated;
         }
 
         public void OnPointsAdded(object sender, EventArgs args)
@@ -320,14 +308,14 @@ namespace Wacom
         public Wacom.Ink.Serialization.Model.RasterBrush CreateSerializationBrush(string name)
         {
             return new Wacom.Ink.Serialization.Model.RasterBrush(name,
-                                            (float)ActiveTool.Brush.FillTileSize.Width, 
-                                            (float)ActiveTool.Brush.FillTileSize.Height,
+                                            (float)mActiveTool.Brush.FillTileSize.Width, 
+                                            (float)mActiveTool.Brush.FillTileSize.Height,
                                             true,
-                                            (RotationMode)ActiveTool.Brush.RotationMode,
-                                            ActiveTool.Brush.Scattering,
-                                            ((DistanceBasedInterpolator)ActiveTool.InkBuilder.SplineInterpolator).Spacing,
-                                            ActiveTool.Fill.ImageFileData,
-                                            new List<byte[]>() { ActiveTool.Shape.ImageFileData },
+                                            (RotationMode)mActiveTool.Brush.RotationMode,
+                                            mActiveTool.Brush.Scattering,
+                                            ((DistanceBasedInterpolator)mActiveTool.InkBuilder.SplineInterpolator).Spacing,
+                                            mActiveTool.Fill.ImageFileData,
+                                            new List<byte[]>() { mActiveTool.Shape.ImageFileData },
                                             new List<string>(),
                                             string.Empty,
                                             Wacom.Ink.Serialization.Model.BlendMode.SourceOver
@@ -385,8 +373,8 @@ namespace Wacom
 
             uint channelMask = (uint)decodedRasterInkBuilder.SplineInterpolator.InterpolatedSplineLayout.ChannelMask;
 
-            ParticleList particleList = new ParticleList(channelMask);
-            particleList.Assign(points);
+            ParticleList particleList = new ParticleList();
+            particleList.Assign(points, channelMask);
 
             RasterInkStroke dryStroke = new RasterInkStroke(stroke, rasterBrush, particleList);
 

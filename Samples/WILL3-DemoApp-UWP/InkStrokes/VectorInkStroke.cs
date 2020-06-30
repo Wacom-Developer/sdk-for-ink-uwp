@@ -23,7 +23,7 @@ namespace Wacom
         public Polygon Polygon;
         public List<PolygonVertices> SimplPoly;
         public PointerDeviceType PointerDeviceType { get; set; }
-        private VectorSplineInkBuilder m_inkBuilder = new VectorSplineInkBuilder();
+        private VectorSplineInkBuilder mInkBuilder = new VectorSplineInkBuilder();
 
         public VectorInkStroke(Stroke stroke, Ink.Serialization.Model.VectorBrush vectorBrush, PipelineData pipelineData)
         {
@@ -95,7 +95,7 @@ namespace Wacom
 
         public void UpdateSpline(Spline newSpline)
         {
-            var result = m_inkBuilder.AddWholePath(newSpline, Layout, VectorBrush);
+            var result = mInkBuilder.AddWholePath(newSpline, Layout, VectorBrush);
 
             Spline = newSpline;
             SimplPoly = result.Merged.Addition;

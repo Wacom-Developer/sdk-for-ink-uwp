@@ -21,19 +21,19 @@ namespace Wacom
     public class Serializer 
     {
         #region Fields
-        private EasClientDeviceInformation m_eas = new EasClientDeviceInformation();
+        private EasClientDeviceInformation mEAS = new EasClientDeviceInformation();
 
         private Wacom.Ink.Serialization.Model.Environment mEnvironment = new Wacom.Ink.Serialization.Model.Environment();
-        private Dictionary<Identifier, Wacom.Ink.Serialization.Model.Environment> m_environments = new Dictionary<Identifier, Wacom.Ink.Serialization.Model.Environment>();
+        private Dictionary<Identifier, Wacom.Ink.Serialization.Model.Environment> mEnvironments = new Dictionary<Identifier, Wacom.Ink.Serialization.Model.Environment>();
         private readonly SensorChannel mTimestampSensorChannel;
 
-        private Dictionary<Identifier, SensorData> m_sensorDataMap = new Dictionary<Identifier, SensorData>(); private Dictionary<PointerDeviceType, Identifier> m_deviceTypeMap = new Dictionary<PointerDeviceType, Identifier>();
-        private Dictionary<Identifier, InkInputProvider> m_inkInputProvidersMap = new Dictionary<Identifier, InkInputProvider>();
-        private Dictionary<Identifier, SensorChannelsContext> m_sensorChannelsContexts = new Dictionary<Identifier, SensorChannelsContext>();
-        private InputDevice m_currentInputDevice = new InputDevice();
-        private Dictionary<Identifier, InputDevice> m_inputDevices = new Dictionary<Identifier, InputDevice>();
-        private Dictionary<Identifier, SensorContext> m_sensorContexts = new Dictionary<Identifier, SensorContext>();
-        private Dictionary<Identifier, InputContext> m_inputContexts = new Dictionary<Identifier, InputContext>();
+        private Dictionary<Identifier, SensorData> mSensorDataMap = new Dictionary<Identifier, SensorData>(); private Dictionary<PointerDeviceType, Identifier> mDeviceTypeMap = new Dictionary<PointerDeviceType, Identifier>();
+        private Dictionary<Identifier, InkInputProvider> mInkInputProvidersMap = new Dictionary<Identifier, InkInputProvider>();
+        private Dictionary<Identifier, SensorChannelsContext> mSensorChannelsContexts = new Dictionary<Identifier, SensorChannelsContext>();
+        private InputDevice mCurrentInputDevice = new InputDevice();
+        private Dictionary<Identifier, InputDevice> mInputDevices = new Dictionary<Identifier, InputDevice>();
+        private Dictionary<Identifier, SensorContext> mSensorContexts = new Dictionary<Identifier, SensorContext>();
+        private Dictionary<Identifier, InputContext> mInputContexts = new Dictionary<Identifier, InputContext>();
 
         #endregion
 
@@ -67,36 +67,36 @@ namespace Wacom
             penInputProvider.Seal();
 
             // Cache input providers
-            m_inkInputProvidersMap.Add(mouseInputProvider.Id, mouseInputProvider);
-            m_inkInputProvidersMap.Add(touchInputProvider.Id, touchInputProvider);
-            m_inkInputProvidersMap.Add(penInputProvider.Id, penInputProvider);
+            mInkInputProvidersMap.Add(mouseInputProvider.Id, mouseInputProvider);
+            mInkInputProvidersMap.Add(touchInputProvider.Id, touchInputProvider);
+            mInkInputProvidersMap.Add(penInputProvider.Id, penInputProvider);
 
             // Init input device
-            m_currentInputDevice.Properties["dev.name"] = m_eas.FriendlyName;
-            m_currentInputDevice.Properties["dev.model"] = m_eas.SystemProductName;
-            m_currentInputDevice.Properties["dev.manufacturer"] = m_eas.SystemManufacturer;
-            m_currentInputDevice.Seal();
+            mCurrentInputDevice.Properties["dev.name"] = mEAS.FriendlyName;
+            mCurrentInputDevice.Properties["dev.model"] = mEAS.SystemProductName;
+            mCurrentInputDevice.Properties["dev.manufacturer"] = mEAS.SystemManufacturer;
+            mCurrentInputDevice.Seal();
 
             // Cache input device
-            m_inputDevices.Add(m_currentInputDevice.Id, m_currentInputDevice);
+            mInputDevices.Add(mCurrentInputDevice.Id, mCurrentInputDevice);
 
             // Init environment
-            mEnvironment.Properties["os.name"] = m_eas.OperatingSystem;
+            mEnvironment.Properties["os.name"] = mEAS.OperatingSystem;
             mEnvironment.Properties["os.version.code"] = System.Environment.OSVersion.Version.ToString();
             mEnvironment.Seal();
 
             // Cache the environment
-            m_environments.Add(mEnvironment.Id, mEnvironment);
+            mEnvironments.Add(mEnvironment.Id, mEnvironment);
 
             // Init sensor channels contexts
-            SensorChannelsContext mouseSensorChannelsContext = SensorChannelsContext.CreateDefault(mouseInputProvider, m_currentInputDevice); //new SensorChannelsContext(mouseInputProvider, m_currentInputDevice, m_sensorChannels);
-            SensorChannelsContext touchSensorChannelsContext = SensorChannelsContext.CreateDefault(touchInputProvider, m_currentInputDevice); //new SensorChannelsContext(touchInputProvider, m_currentInputDevice, m_sensorChannels);
-            SensorChannelsContext penSensorChannelsContext = SensorChannelsContext.CreateDefault(penInputProvider, m_currentInputDevice); //new SensorChannelsContext(penInputProvider, m_currentInputDevice, m_sensorChannels);
+            SensorChannelsContext mouseSensorChannelsContext = CreateChannelsGroup(mouseInputProvider, mCurrentInputDevice); 
+            SensorChannelsContext touchSensorChannelsContext = CreateChannelsGroup(touchInputProvider, mCurrentInputDevice); 
+            SensorChannelsContext penSensorChannelsContext = CreateChannelsGroup(penInputProvider, mCurrentInputDevice); 
 
             // Cache sensor channels contexts
-            m_sensorChannelsContexts.Add(mouseSensorChannelsContext.Id, mouseSensorChannelsContext);
-            m_sensorChannelsContexts.Add(touchSensorChannelsContext.Id, touchSensorChannelsContext);
-            m_sensorChannelsContexts.Add(penSensorChannelsContext.Id, penSensorChannelsContext);
+            mSensorChannelsContexts.Add(mouseSensorChannelsContext.Id, mouseSensorChannelsContext);
+            mSensorChannelsContexts.Add(touchSensorChannelsContext.Id, touchSensorChannelsContext);
+            mSensorChannelsContexts.Add(penSensorChannelsContext.Id, penSensorChannelsContext);
 
             // Init sensor contexts
             SensorContext mouseSensorContext = new SensorContext();
@@ -109,9 +109,9 @@ namespace Wacom
             penSensorContext.AddSensorChannelsContext(penSensorChannelsContext);
 
             // Cache sensor contexts
-            m_sensorContexts.Add(mouseSensorContext.Id, mouseSensorContext);
-            m_sensorContexts.Add(touchSensorContext.Id, touchSensorContext);
-            m_sensorContexts.Add(penSensorContext.Id, penSensorContext);
+            mSensorContexts.Add(mouseSensorContext.Id, mouseSensorContext);
+            mSensorContexts.Add(touchSensorContext.Id, touchSensorContext);
+            mSensorContexts.Add(penSensorContext.Id, penSensorContext);
 
             // Init input contexts
             InputContext mouseInputContext = new InputContext(mEnvironment.Id, mouseSensorContext.Id);
@@ -119,15 +119,37 @@ namespace Wacom
             InputContext penInputContext = new InputContext(mEnvironment.Id, penSensorContext.Id);
 
             // Cache input contexts
-            m_inputContexts.Add(mouseInputContext.Id, mouseInputContext);
-            m_inputContexts.Add(touchInputContext.Id, touchInputContext);
-            m_inputContexts.Add(penInputContext.Id, penInputContext);
+            mInputContexts.Add(mouseInputContext.Id, mouseInputContext);
+            mInputContexts.Add(touchInputContext.Id, touchInputContext);
+            mInputContexts.Add(penInputContext.Id, penInputContext);
 
-            m_deviceTypeMap.Add(PointerDeviceType.Mouse, mouseInputContext.Id);
-            m_deviceTypeMap.Add(PointerDeviceType.Touch, touchInputContext.Id);
-            m_deviceTypeMap.Add(PointerDeviceType.Pen, penInputContext.Id);
+            mDeviceTypeMap.Add(PointerDeviceType.Mouse, mouseInputContext.Id);
+            mDeviceTypeMap.Add(PointerDeviceType.Touch, touchInputContext.Id);
+            mDeviceTypeMap.Add(PointerDeviceType.Pen, penInputContext.Id);
         }
 
+        public static SensorChannelsContext CreateChannelsGroup(
+           InkInputProvider inkInputProvider,
+           InputDevice inputDevice,
+           uint? latency = null,
+           uint? samplingRateHint = null)
+        {
+            const uint precision = 2;
+
+            List<SensorChannel> sensorChannels = new List<SensorChannel>();
+            sensorChannels.Add(new SensorChannel(InkSensorType.X, InkSensorMetricType.Length, null, 0.0f, 0.0f, precision));
+            sensorChannels.Add(new SensorChannel(InkSensorType.Y, InkSensorMetricType.Length, null, 0.0f, 0.0f, precision));
+            sensorChannels.Add(new SensorChannel(InkSensorType.Timestamp, InkSensorMetricType.Time, null, 0.0f, 0.0f, 0));
+
+            SensorChannelsContext sensorChannelsContext = new SensorChannelsContext(
+                inkInputProvider,
+                inputDevice,
+                sensorChannels,
+                latency,
+                samplingRateHint);
+
+            return sensorChannelsContext;
+        }
 
         public void EncodeStroke(VectorInkStroke stroke)
         {
@@ -160,9 +182,9 @@ namespace Wacom
 
         public Identifier AddSensorData(PointerDeviceType deviceType, List<PointerData> pointerDataList)
         {
-            Identifier inputContextId = m_deviceTypeMap[deviceType];
-            InputContext inputContext = m_inputContexts[inputContextId];
-            SensorContext sensorContext = m_sensorContexts[inputContext.SensorContextId];
+            Identifier inputContextId = mDeviceTypeMap[deviceType];
+            InputContext inputContext = mInputContexts[inputContextId];
+            SensorContext sensorContext = mSensorContexts[inputContext.SensorContextId];
 
             // Create sensor data using the input context
             SensorData sensorData = new SensorData(
@@ -172,7 +194,7 @@ namespace Wacom
 
             PopulateSensorData(sensorData, sensorContext, pointerDataList);
 
-            m_sensorDataMap.TryAdd(sensorData.Id, sensorData);
+            mSensorDataMap.TryAdd(sensorData.Id, sensorData);
 
             return sensorData.Id;
         }
@@ -191,7 +213,7 @@ namespace Wacom
 
             if (sensorDataId != Identifier.Empty)
             {
-                SensorData sensorData = m_sensorDataMap[sensorDataId];
+                SensorData sensorData = mSensorDataMap[sensorDataId];
 
                 AddSensorDataToModel(sensorData);
             }
@@ -199,8 +221,6 @@ namespace Wacom
 
         private void AddRasterBrushToInkDoc(PointerDeviceType deviceType, RasterBrush rasterBrush, Style rasterStyle, StrokeConstants strokeConstants, uint startRandomSeed)
         {
-            rasterStyle.RenderModeUri = $"will3://rendering//{deviceType.ToString()}";
-
             if (!InkDocument.Brushes.TryGetBrush(rasterBrush.Name, out Brush foundBrush))
             {
                 InkDocument.Brushes.AddRasterBrush(rasterBrush);
@@ -209,8 +229,6 @@ namespace Wacom
 
         private void AddVectorBrushToInkDoc(string pointerDeviceType, Wacom.Ink.Serialization.Model.VectorBrush vectorBrush, Style style)
         {
-            style.RenderModeUri = $"will3://rendering//{pointerDeviceType}";
-
             if (!InkDocument.Brushes.TryGetBrush(vectorBrush.Name, out Brush foundBrush))
             {
                 InkDocument.Brushes.AddVectorBrush(vectorBrush);
@@ -240,8 +258,8 @@ namespace Wacom
         {
             InputDevice inputDevice = new InputDevice();
             inputDevice.Properties["dev.name"] = System.Environment.MachineName;
-            //inputDevice.Properties["dev.model"] = m_eas.SystemProductName;
-            //inputDevice.Properties["dev.manufacturer"] = m_eas.SystemManufacturer;
+            inputDevice.Properties["dev.model"] = mEAS.SystemProductName;
+            inputDevice.Properties["dev.manufacturer"] = mEAS.SystemManufacturer;
             inputDevice.Seal();
 
             Identifier inputDeviceId = inputDevice.Id;
@@ -255,78 +273,6 @@ namespace Wacom
             return inputDevice;
         }
 
-        private SensorContext CreateAndAddSensorContext(InkInputProvider inkInputProvider, InputDevice inputDevice)
-        {
-            // Create the sensor channel groups using the input provider and device
-            SensorChannelsContext defaultSensorChannelsContext = SensorChannelsContext.CreateDefault(inkInputProvider, inputDevice);
-
-            SensorChannelsContext specialChannelsContext = new SensorChannelsContext(
-                inkInputProvider,
-                inputDevice,
-                new List<SensorChannel> { mTimestampSensorChannel },//, mSpecialPressureSensorChannel },
-                latency: 2,
-                samplingRateHint: 2);
-
-            // Create the sensor context using the sensor channels contexts
-            SensorContext sensorContext = new SensorContext();
-            sensorContext.AddSensorChannelsContext(defaultSensorChannelsContext);
-            //sensorContext.AddSensorChannelsContext(specialChannelsContext);
-
-            Identifier sensorContextId = sensorContext.Id;
-            bool res = InkDocument.InputConfiguration.SensorContexts.Any((context) => context.Id == sensorContextId);
-
-            if (!res)
-            {
-                InkDocument.InputConfiguration.SensorContexts.Add(sensorContext);
-            }
-
-            return sensorContext;
-        }
-
-        private Identifier CreateAndAddInputContext(Identifier sensorContextId)
-        {
-            InputContext inputContext = new InputContext(mEnvironment.Id, sensorContextId);
-
-            Identifier inputContextId = inputContext.Id;
-            bool res = InkDocument.InputConfiguration.InputContexts.Any((context) => context.Id == inputContextId);
-
-            if (!res)
-            {
-                InkDocument.InputConfiguration.InputContexts.Add(inputContext);
-            }
-
-            return inputContextId;
-        }
-
-        private void FillDefaultChannels(SensorData sensorData, SensorContext sensorContext, List<PointerData> pointerDataList)
-        {
-            SensorChannelsContext channels = sensorContext.DefaultSensorChannelsContext;
-
-            sensorData.AddData(channels.GetChannel(InkSensorType.X), pointerDataList.Select((pd) => pd.X).ToList());
-            sensorData.AddData(channels.GetChannel(InkSensorType.Y), pointerDataList.Select((pd) => pd.Y).ToList());
-            sensorData.AddTimestampData(channels.GetChannel(InkSensorType.Timestamp), pointerDataList.Select((pd) => pd.Timestamp).ToList());
-
-            if (pointerDataList[0].Force.HasValue)
-            {
-                sensorData.AddData(channels.GetChannel(InkSensorType.Pressure), pointerDataList.Select((pd) => pd.Force.Value).ToList());
-            }
-
-            if (pointerDataList[0].Radius.HasValue)
-            {
-                sensorData.AddData(channels.GetChannel(InkSensorType.RadiusX), pointerDataList.Select((pd) => pd.Radius.Value).ToList());
-            }
-
-            if (pointerDataList[0].AzimuthAngle.HasValue)
-            {
-                sensorData.AddData(channels.GetChannel(InkSensorType.Azimuth), pointerDataList.Select((pd) => pd.AzimuthAngle.Value).ToList());
-            }
-
-            if (pointerDataList[0].AltitudeAngle.HasValue)
-            {
-                sensorData.AddData(channels.GetChannel(InkSensorType.Altitude), pointerDataList.Select((pd) => pd.AltitudeAngle.Value).ToList());
-            }
-        }
-
         private void PopulateSensorData(SensorData sensorData, SensorContext sensorContext, List<PointerData> pointerDataList)
         {
             SensorChannelsContext channels = sensorContext.DefaultSensorChannelsContext;
@@ -334,26 +280,6 @@ namespace Wacom
             sensorData.AddData(channels.GetChannel(InkSensorType.X), pointerDataList.Select((pd) => pd.X).ToList());
             sensorData.AddData(channels.GetChannel(InkSensorType.Y), pointerDataList.Select((pd) => pd.Y).ToList());
             sensorData.AddTimestampData(channels.GetChannel(InkSensorType.Timestamp), pointerDataList.Select((pd) => pd.Timestamp).ToList());
-
-            if (pointerDataList[0].Force.HasValue)
-            {
-                sensorData.AddData(channels.GetChannel(InkSensorType.Pressure), pointerDataList.Select((pd) => pd.Force.Value).ToList());
-            }
-
-            if (pointerDataList[0].Radius.HasValue)
-            {
-                sensorData.AddData(channels.GetChannel(InkSensorType.RadiusX), pointerDataList.Select((pd) => pd.Radius.Value).ToList());
-            }
-
-            if (pointerDataList[0].AzimuthAngle.HasValue)
-            {
-                sensorData.AddData(channels.GetChannel(InkSensorType.Azimuth), pointerDataList.Select((pd) => pd.AzimuthAngle.Value).ToList());
-            }
-
-            if (pointerDataList[0].AltitudeAngle.HasValue)
-            {
-                sensorData.AddData(channels.GetChannel(InkSensorType.Altitude), pointerDataList.Select((pd) => pd.AltitudeAngle.Value).ToList());
-            }
         }
 
         private void AddSensorDataToModel(SensorData sensorData)
@@ -363,14 +289,14 @@ namespace Wacom
             {
                 InkDocument.SensorData.Add(sensorData);
 
-                InputContext inputContext = m_inputContexts[sensorData.InputContextID];
+                InputContext inputContext = mInputContexts[sensorData.InputContextID];
 
                 // Add input context if missing
                 if (!InkDocument.InputConfiguration.InputContexts.Contains(inputContext))
                 {
                     InkDocument.InputConfiguration.InputContexts.Add(inputContext);
 
-                    Wacom.Ink.Serialization.Model.Environment environment = m_environments[inputContext.EnvironmentId];
+                    Wacom.Ink.Serialization.Model.Environment environment = mEnvironments[inputContext.EnvironmentId];
 
                     // Add environment if missing
                     if (!InkDocument.InputConfiguration.Environments.Contains(environment))
@@ -378,7 +304,7 @@ namespace Wacom
                         InkDocument.InputConfiguration.Environments.Add(environment);
                     }
 
-                    SensorContext sensorContext = m_sensorContexts[inputContext.SensorContextId];
+                    SensorContext sensorContext = mSensorContexts[inputContext.SensorContextId];
 
                     // Add sensor context if missing
                     if (!InkDocument.InputConfiguration.SensorContexts.Contains(sensorContext))
@@ -410,20 +336,20 @@ namespace Wacom
         public void LoadSensorDataFromModel(InkModel inkModel, SensorData sensorData)
         {
             // Load sensor data if missing
-            if (m_sensorDataMap.TryAdd(sensorData.Id, sensorData))
+            if (mSensorDataMap.TryAdd(sensorData.Id, sensorData))
             {
                 InputContext inputContext = inkModel.InputConfiguration.InputContexts.Find((ic) => ic.Id == sensorData.InputContextID);
 
                 // Load input context if missing
-                if (m_inputContexts.TryAdd(inputContext.Id, inputContext))
+                if (mInputContexts.TryAdd(inputContext.Id, inputContext))
                 {
                     Wacom.Ink.Serialization.Model.Environment environment = inkModel.InputConfiguration.Environments.Find((env) => env.Id == inputContext.EnvironmentId);
-                    m_environments.TryAdd(environment.Id, environment);
+                    mEnvironments.TryAdd(environment.Id, environment);
 
                     SensorContext sensorContext = inkModel.InputConfiguration.SensorContexts.Find((sc) => sc.Id == inputContext.SensorContextId);
 
                     // Load sensor context if missing
-                    if (m_sensorContexts.TryAdd(sensorContext.Id, sensorContext))
+                    if (mSensorContexts.TryAdd(sensorContext.Id, sensorContext))
                     {
                         // Iterate and load sensor channels contexts if missing
                         for (int j = 0; j < sensorContext.SensorChannelContexts.Count; j++)
@@ -431,10 +357,10 @@ namespace Wacom
                             SensorChannelsContext sensorChannelsContext = sensorContext.SensorChannelContexts[j];
 
                             // Load input device if missing
-                            m_inputDevices.TryAdd(sensorChannelsContext.InputDevice.Id, sensorChannelsContext.InputDevice);
+                            mInputDevices.TryAdd(sensorChannelsContext.InputDevice.Id, sensorChannelsContext.InputDevice);
 
                             // Load ink input provider if missing
-                            m_inkInputProvidersMap.TryAdd(sensorChannelsContext.InkInputProvider.Id, sensorChannelsContext.InkInputProvider);
+                            mInkInputProvidersMap.TryAdd(sensorChannelsContext.InkInputProvider.Id, sensorChannelsContext.InkInputProvider);
                         }
                     }
                 }

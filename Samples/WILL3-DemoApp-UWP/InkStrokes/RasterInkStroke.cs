@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Windows.Devices.Input;
 using Windows.Foundation;
 
@@ -39,8 +40,8 @@ namespace Wacom
 
             uint channelMask = (uint)inkBuilder.SplineInterpolator.InterpolatedSplineLayout.ChannelMask;
 
-            Path = new ParticleList(channelMask);
-            Path.Assign(points);
+            Path = new ParticleList();
+            Path.Assign(points, channelMask);
 
             RandomSeed = seed;
             StrokeConstants = StrokeParams;
@@ -50,6 +51,8 @@ namespace Wacom
             // Cloning is needed, otherwise the spatial data is corrupted
             Spline = inkBuilder.SplineProducer.AllData.Clone();
             Layout = inkBuilder.Layout;
+
+            Trace.WriteLine($"WILL3 RasterInkStroke {Id.ToString()} {points.Count} {rasterBrush.Name}");
         }
 
         public RasterInkStroke(Stroke stroke, RasterBrush rasterBrush, ParticleList particleList)
@@ -73,6 +76,7 @@ namespace Wacom
 
             Spline = stroke.Spline;
             Layout = stroke.Layout;
+            Trace.WriteLine($"WILL3 RasterInkStroke {Id.ToString()} {rasterBrush.Name}");
         }
 
     }

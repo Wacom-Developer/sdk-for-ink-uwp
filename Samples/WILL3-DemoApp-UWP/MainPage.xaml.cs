@@ -25,7 +25,7 @@ namespace Wacom
     {
         #region Fields
 
-        private Renderer m_renderer;
+        private Renderer mRenderer;
         private MediaColor mBrushColor;
 
         public MediaColor BrushColor {
@@ -33,7 +33,7 @@ namespace Wacom
             set
             {
                 mBrushColor = value;
-                m_renderer.StrokeHandler.BrushColor = value;
+                mRenderer.StrokeHandler.BrushColor = value;
                 BtnColorPicker.Color = value;
                 BtnColorIcon.Foreground = new SolidColorBrush(value);
             }
@@ -54,16 +54,16 @@ namespace Wacom
 
         private void OnPageLoaded(object sender, RoutedEventArgs e)
         {
-            m_renderer = new Renderer(swapChainPanel, VectorBrushStyle.Pen, BrushColor);
+            mRenderer = new Renderer(swapChainPanel, VectorBrushStyle.Pen, BrushColor);
             BrushColor = Colors.Blue;
             ToggleBrushButton(btnPen);
         }
 
         private void OnPageUnloaded(object sender, RoutedEventArgs e)
         {
-            m_renderer.StopProcessingInput();
-            m_renderer.Dispose();
-            m_renderer = null;
+            mRenderer.StopProcessingInput();
+            mRenderer.Dispose();
+            mRenderer = null;
         }
 
         #endregion
@@ -100,20 +100,28 @@ namespace Wacom
 
         private void CheckControlType(VectorBrushStyle brushStyle, AppBarToggleButton btn)
         {
-            btnSelect.IsEnabled = true;
-            m_renderer.SetHandler(brushStyle, BrushColor);
+            EnableManipulation(true);
+            mRenderer.SetHandler(brushStyle, BrushColor);
             ToggleBrushButton(btn);
         }
 
         private void CheckControlType(RasterBrushStyle brushStyle, AppBarToggleButton btn)
         {
-            btnSelect.IsEnabled = false;
-            m_renderer.SetHandler(brushStyle, BrushColor);
+            EnableManipulation(false);
+            mRenderer.SetHandler(brushStyle, BrushColor);
             ToggleBrushButton(btn);
         }
 
+        private void EnableManipulation(bool enable)
+        {
+            btnSelect.IsEnabled = enable;
+            btnSelectWhole.IsEnabled = enable;
+            btnErase.IsEnabled = enable;
+            btnEraseWhole.IsEnabled = enable;
+        }
+
         private AppBarToggleButton mCurrentBrushBtn = null;
-        private AppBarToggleButton mSavedButton = null;
+        //private AppBarToggleButton mSavedButton = null;
 
         private void ToggleBrushButton(AppBarToggleButton btn)
         {
@@ -132,7 +140,7 @@ namespace Wacom
 
         private void OnClear_Click(object sender, RoutedEventArgs e)
         {
-            m_renderer.ClearStrokes();
+            mRenderer.ClearStrokes();
         }
 
         private async void OnSave_Click(object sender, RoutedEventArgs e)
@@ -154,8 +162,7 @@ namespace Wacom
                 CachedFileManager.DeferUpdates(file);
 
                 // Write to file
-                Will3Codec will3Codec = new Will3Codec();
-                await FileIO.WriteBytesAsync(file, will3Codec.Encode(m_renderer.StrokeHandler.Serialize()));
+                await FileIO.WriteBytesAsync(file, Will3Codec.Encode(mRenderer.StrokeHandler.Serialize()));
 
                 // Let Windows know that we're finished changing the file so the other app can update the remote version of the file.
                 // Completing updates may require Windows to ask for user input.
@@ -187,10 +194,9 @@ namespace Wacom
                 {
                     IBuffer fileBuffer = await FileIO.ReadBufferAsync(file);
 
-                    Will3Codec will3Codec = new Will3Codec();
-                    var inkDocument = will3Codec.Decode(fileBuffer.ToArray());
+                    var inkDocument = Will3Codec.Decode(fileBuffer.ToArray());
 
-                    m_renderer.ClearStrokes();
+                    mRenderer.ClearStrokes();
 
                     if (inkDocument.Brushes.RasterBrushes.Count > 0 && inkDocument.Brushes.VectorBrushes.Count > 0)
                     {
@@ -199,15 +205,15 @@ namespace Wacom
                     else if (inkDocument.Brushes.RasterBrushes.Count > 0)
                     {
                         CheckControlType(RasterBrushStyle.Pencil, btnPencil);
-                        m_renderer.LoadInk(inkDocument);
+                        mRenderer.LoadInk(inkDocument);
                     }
                     else if (inkDocument.Brushes.VectorBrushes.Count > 0)
                     {
                         CheckControlType(VectorBrushStyle.Pen, btnPen);
-                        m_renderer.LoadInk(inkDocument);
+                        mRenderer.LoadInk(inkDocument);
                     }
 
-                    m_renderer.RedrawAllStrokes(null, null);
+                    mRenderer.RedrawAllStrokes(null, null);
                 }
                 catch (Exception ex)
                 {
@@ -217,20 +223,30 @@ namespace Wacom
             }
         }
 
-        private void OnSelect_Click(object sender, RoutedEventArgs e)
+        private void OnManipulatePart_Click(object sender, RoutedEventArgs e)
         {
-            if (m_renderer.IsSelecting)
-            {
-                m_renderer.StopSelectionMode();
-                ToggleBrushButton(mSavedButton);
-            }
-            else
-            {
-                m_renderer.StartSelectionMode();
-                mSavedButton = mCurrentBrushBtn;
-                ToggleBrushButton((AppBarToggleButton)sender);
-            }
+            mRenderer.StartSelectionMode(StrokeHandler.SelectionMode.Manipulate | StrokeHandler.SelectionMode.Part);
+            ToggleBrushButton((AppBarToggleButton)sender);
         }
+
+        private void OnManipulateWhole_Click(object sender, RoutedEventArgs e)
+        {
+            mRenderer.StartSelectionMode(StrokeHandler.SelectionMode.Manipulate | StrokeHandler.SelectionMode.Whole);
+            ToggleBrushButton((AppBarToggleButton)sender);
+        }
+
+        private void OnErasePart_Click(object sender, RoutedEventArgs e)
+        {
+            mRenderer.StartSelectionMode(StrokeHandler.SelectionMode.Erase | StrokeHandler.SelectionMode.Part);
+            ToggleBrushButton((AppBarToggleButton)sender);
+        }
+
+        private void OnEraseWhole_Click(object sender, RoutedEventArgs e)
+        {
+            mRenderer.StartSelectionMode(StrokeHandler.SelectionMode.Erase | StrokeHandler.SelectionMode.Whole);
+            ToggleBrushButton((AppBarToggleButton)sender);
+        }
+
     }
 
 }

@@ -20,7 +20,6 @@ namespace Wacom
 
         private readonly VectorBrush mBrush;
 
-        private ConvexHullChainProducer mConvexHullChainProducer;
 
         private PolygonMerger mPolygonMerger;
 
@@ -29,6 +28,7 @@ namespace Wacom
         #region Properties
 
         public PolygonSimplifier PolygonSimplifier { get; private set; }
+        public ConvexHullChainProducer ConvexHullChainProducer { get; private set; }
 
         public BrushApplier BrushApplier { get; private set; }
 
@@ -71,7 +71,7 @@ namespace Wacom
 
             var polys = BrushApplier.Add(mPathSegment.IsFirst, mPathSegment.IsLast, points.Addition, points.Prediction);
 
-            var hulls = mConvexHullChainProducer.Add(mPathSegment.IsFirst, mPathSegment.IsLast, polys.Addition, polys.Prediction);
+            var hulls = ConvexHullChainProducer.Add(mPathSegment.IsFirst, mPathSegment.IsLast, polys.Addition, polys.Prediction);
 
             var merged = mPolygonMerger.Add(mPathSegment.IsFirst, mPathSegment.IsLast, hulls.Addition, hulls.Prediction);
 
@@ -136,9 +136,9 @@ namespace Wacom
                 };
             }
 
-            if (mConvexHullChainProducer == null)
+            if (ConvexHullChainProducer == null)
             {
-                mConvexHullChainProducer = new ConvexHullChainProducer()
+                ConvexHullChainProducer = new ConvexHullChainProducer()
                 {
                     KeepAllData = true
                 };

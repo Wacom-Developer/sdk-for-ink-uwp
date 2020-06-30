@@ -8,11 +8,11 @@ namespace Wacom
     /// </summary>
 	public class DirtyRectManager
 	{
-		private Rect m_prevPredictedStrokeRect;
+		private Rect mPrevPredictedStrokeRect;
 
 		public DirtyRectManager()
 		{
-			m_prevPredictedStrokeRect = Rect.Empty;
+			mPrevPredictedStrokeRect = Rect.Empty;
 		}
 
 		/// <summary>
@@ -22,7 +22,7 @@ namespace Wacom
 		/// <returns>The union of the specified rect and the rect stored in this object.</returns>
 		public Rect GetUnionRect(Rect currentChunkRect)
 		{
-			currentChunkRect.Union(m_prevPredictedStrokeRect);
+			currentChunkRect.Union(mPrevPredictedStrokeRect);
 
 			return currentChunkRect;
 		}
@@ -43,9 +43,9 @@ namespace Wacom
 		{
 			Rect updateRect = addedStrokeRect;
 
-			if (!m_prevPredictedStrokeRect.IsEmpty)
+			if (!mPrevPredictedStrokeRect.IsEmpty)
 			{
-				updateRect.Union(m_prevPredictedStrokeRect);
+				updateRect.Union(mPrevPredictedStrokeRect);
 			}
 
 			if (!predictedStrokeRect.IsEmpty)
@@ -53,7 +53,7 @@ namespace Wacom
 				updateRect.Union(predictedStrokeRect);
 			}
 
-            m_prevPredictedStrokeRect = predictedStrokeRect;
+            mPrevPredictedStrokeRect = predictedStrokeRect;
 
             return updateRect;
 		}
@@ -63,7 +63,7 @@ namespace Wacom
 		/// </summary>
 		public void Reset()
 		{
-			m_prevPredictedStrokeRect = Rect.Empty;
+			mPrevPredictedStrokeRect = Rect.Empty;
 		}
 	}
 }

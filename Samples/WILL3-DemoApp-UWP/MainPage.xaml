@@ -111,9 +111,27 @@
             <AppBarSeparator/>
 
             <AppBarToggleButton 
-                Label="Select" Click="OnSelect_Click" x:Name="btnSelect">
+                Label="Select" Click="OnManipulatePart_Click" x:Name="btnSelect">
                 <AppBarToggleButton.Icon>
                     <BitmapIcon UriSource="ms-appx:///Assets/btn_tools/btn_selector.png"/>
+                </AppBarToggleButton.Icon>
+            </AppBarToggleButton>
+            <AppBarToggleButton 
+                Label="Select (whole)" Click="OnManipulateWhole_Click"  x:Name="btnSelectWhole">
+                <AppBarToggleButton.Icon>
+                    <BitmapIcon UriSource="ms-appx:///Assets/btn_tools/btn_selector_whole_stroke.png"/>
+                </AppBarToggleButton.Icon>
+            </AppBarToggleButton>
+            <AppBarToggleButton 
+                Label="Erase" Click="OnErasePart_Click" x:Name="btnErase">
+                <AppBarToggleButton.Icon>
+                    <BitmapIcon UriSource="ms-appx:///Assets/btn_tools/eraser_partial_stroke.png"/>
+                </AppBarToggleButton.Icon>
+            </AppBarToggleButton>
+            <AppBarToggleButton 
+                Label="Erase (whole)" Click="OnEraseWhole_Click" x:Name="btnEraseWhole">
+                <AppBarToggleButton.Icon>
+                    <BitmapIcon UriSource="ms-appx:///Assets/btn_tools/eraser_whole_stroke.png"/>
                 </AppBarToggleButton.Icon>
             </AppBarToggleButton>
         </CommandBar>
