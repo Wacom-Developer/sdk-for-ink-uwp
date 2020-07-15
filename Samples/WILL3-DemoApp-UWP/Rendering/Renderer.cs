@@ -346,7 +346,7 @@ namespace Wacom
         public void RedrawAllStrokes(IEnumerable<Identifier> excluded, Rect? clipRect)
         {
             RenderingContext.SetTarget(AllStrokesLayer, clipRect);
-            RenderingContext.ClearColor(Colors.Transparent);
+            RenderingContext.ClearColor(StrokeHandler.BackgroundColor);
 
             StrokeHandler.RenderAllStrokes(RenderingContext, excluded, clipRect);
 

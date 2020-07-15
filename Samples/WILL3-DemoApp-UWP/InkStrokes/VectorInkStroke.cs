@@ -25,7 +25,7 @@ namespace Wacom
         public PointerDeviceType PointerDeviceType { get; set; }
         private VectorSplineInkBuilder mInkBuilder = new VectorSplineInkBuilder();
 
-        public VectorInkStroke(Stroke stroke, Ink.Serialization.Model.VectorBrush vectorBrush, PipelineData pipelineData)
+        public VectorInkStroke(Stroke stroke, Wacom.Ink.Geometry.VectorBrush vectorBrush, PipelineData pipelineData)
         {
             Id = stroke.Id;
             PathPointProperties ppp = stroke.Style.PathPointProperties;
@@ -37,12 +37,21 @@ namespace Wacom
 
             Spline = stroke.Spline;
             Layout = stroke.Layout;
-            VectorBrush = new Wacom.Ink.Geometry.VectorBrush(vectorBrush.BrushPolygons.ToArray());
+            VectorBrush = vectorBrush;
             Polygon = PolygonUtil.ConvertPolygon(pipelineData.Merged.Addition);
             SimplPoly = pipelineData.Merged.Addition;
             SensorDataOffset = stroke.SensorDataOffset;
             SensorDataMappings = stroke.SensorDataMappings;
             SensorDataId = stroke.SensorDataId;
+
+			Attributes attribs = new Attributes(Color);
+
+			if (ppp.Size.HasValue)
+			{
+				attribs.Size = ppp.Size.Value;
+			}
+
+			Constants = attribs;
         }
 
         public VectorInkStroke(PointerDeviceType pointerDeviceType, VectorInkBuilder inkBuilder, MediaColor color, List<PolygonVertices> mergedPolygons, Ink.Geometry.VectorBrush vectorBrush, Identifier sensorDataId)
@@ -60,6 +69,8 @@ namespace Wacom
             Layout = inkBuilder.Layout;
             VectorBrush = vectorBrush;
             SimplPoly = mergedPolygons;
+
+			Constants = new Attributes(Color);
         }
 
         public VectorInkStroke(Spline newSpline, IInkStroke originalStroke, int firstPointIndex, int pointsCount)
@@ -85,6 +96,8 @@ namespace Wacom
 
                 SensorDataMappings = newSplineSensorDataMappings;
             }
+
+			Constants = originalStroke.Constants;
 
             IStrokeAttributes originConstants = originalStroke.Constants;
             Color.R = (byte)(originConstants.Red * 255);
@@ -114,7 +127,7 @@ namespace Wacom
 
         public Wacom.Ink.Geometry.VectorBrush VectorBrush { get; set; }
 
-        public IStrokeAttributes Constants { get => new Attributes(Color); }
+		public IStrokeAttributes Constants { get; } 
 
 
         public uint SensorDataOffset { get; set; }
@@ -166,7 +179,7 @@ namespace Wacom
                 Alpha = color.A / 255f;
             }
 
-            public float Size => 1.0f;
+            public float Size { get; set; } = 1.0f;
 
             public float Rotation => 0.0f;
 

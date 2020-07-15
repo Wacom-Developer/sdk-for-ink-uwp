@@ -157,63 +157,10 @@ namespace Wacom
 
         public PixelInfo(Uri uri)
         {
-            PixelData = Task.Run(async () => await GetPixelDataAsync(uri)).Result;
-            ImageFileData = Task.Run(async () => await GetImageFileData(uri)).Result;
+            PixelData = Task.Run(async () => await Utils.GetPixelDataAsync(uri)).Result;
+            ImageFileData = Task.Run(async () => await Utils.GetImageFileData(uri)).Result;
         }
 
-        /// <summary>
-        /// Loads bitmap pixel data from app resources
-        /// </summary>
-        /// <param name="uri"></param>
-        /// <returns></returns>
-        private static async Task<PixelData> GetPixelDataAsync(Uri uri)
-        {
-            StorageFile file = await StorageFile.GetFileFromApplicationUriAsync(uri);
-
-            using (IRandomAccessStream fileStream = await file.OpenAsync(FileAccessMode.Read))
-            {
-                BitmapDecoder decoder = await BitmapDecoder.CreateAsync(fileStream);
-
-                PixelDataProvider provider = await decoder.GetPixelDataAsync(
-                  BitmapPixelFormat.Bgra8,
-                  BitmapAlphaMode.Premultiplied,
-                  new BitmapTransform(),
-                  ExifOrientationMode.IgnoreExifOrientation,
-                  ColorManagementMode.DoNotColorManage);
-
-                var buffer = provider.DetachPixelData().AsBuffer();
-
-                return new PixelData(buffer, decoder.PixelWidth, decoder.PixelHeight);
-            }
-        }
-
-        /// <summary>
-        /// Loads image file data from app resources
-        /// </summary>
-        private async static Task<byte[]> GetImageFileData(Uri uri)
-        {
-            //StreamResourceInfo sri = Application.GetResourceStream(uri);
-            //if (sri != null)
-            //{
-            //    using (Stream s = sri.Stream)
-            //    {
-            //        byte[] data = new byte[s.Length];
-            //        s.Read(data, 0, (int)s.Length);
-            //        return data;
-            //    }
-            //}
-            //return null;
-            var fileToRead = await StorageFile.GetFileFromApplicationUriAsync(uri);
-
-            
-            using (BinaryReader fileReader = new BinaryReader(await fileToRead.OpenStreamForReadAsync()))
-            {
-                byte[] data = new byte[fileReader.BaseStream.Length];
-                fileReader.Read(data, 0, data.Length);
-                return data;
-            }
-            
-        }
 
     }
 
@@ -231,8 +178,6 @@ namespace Wacom
 
         private static readonly ToolConfig mSizeConfig = new ToolConfig()
         {
-            //initValue = MinSize,
-            //finalValue = 10,
             minValue = MinSize,
             maxValue = MaxSize,
             minSpeed = 80,
@@ -241,8 +186,6 @@ namespace Wacom
         };
         private static readonly ToolConfig mAlphaConfig = new ToolConfig()
         {
-            //initValue = 0.1f,
-            //finalValue = 0.5f,
             minValue = MinAlpha,
             maxValue = MaxAlpha,
             minSpeed = 80,
