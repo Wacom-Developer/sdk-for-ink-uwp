@@ -158,6 +158,7 @@ namespace Wacom
         {
             if (IsSelecting)
             {
+                OnToolTranslateFinished(this, (mSelectTool as VectorManipulationTool).Translation);
                 mActiveTool = null;
                 BrushColor = mSavedColor;
                 mSelectTool = null;
@@ -177,7 +178,7 @@ namespace Wacom
         /// </summary>
         /// <param name="renderingContext">RenderingContext to draw to</param>
         /// <param name="o">Cached stroke (as object)</param>
-        public override void DoRenderStroke(RenderingContext renderingContext, object o, bool translationLayerPainted)
+        public override void DoRenderStroke(RenderingContext renderingContext, object o)
         {
             VectorInkStroke stroke = (VectorInkStroke)o;
             renderingContext.FillPolygon(stroke.Polygon, stroke.Color, Ink.Rendering.BlendMode.SourceOver);
@@ -230,7 +231,8 @@ namespace Wacom
         public override InkModel Serialize()
         {
             mSerializer.Init();
-            foreach (var stroke in mDryStrokes)
+            var orderedStrokes = mDryStrokes.OrderBy((stroke) => stroke.ZIndex);
+            foreach (var stroke in orderedStrokes)
             {
                 mSerializer.EncodeStroke(stroke);
             }
@@ -241,7 +243,8 @@ namespace Wacom
         {
             lock (mDryStrokeLock)
             {
-                foreach (var stroke in mDryStrokes)
+                var orderedStrokes = mDryStrokes.OrderBy((stroke) => stroke.ZIndex);
+                foreach (var stroke in orderedStrokes)
                 {
                     if (excluded == null || !excluded.Contains(stroke.Id))
                     {
@@ -249,7 +252,7 @@ namespace Wacom
                         context.SetTarget(mRenderer.CurrentStrokeLayer);
                         context.ClearColor(Colors.Transparent);
 
-                        DoRenderStroke(context, stroke, mRenderer.TranslationLayerPainted);
+                        DoRenderStroke(context, stroke);
 
                         // Blend stroke to Scene Layer
                         context.SetTarget(mRenderer.SceneLayer);
@@ -290,7 +293,7 @@ namespace Wacom
             mRenderer.RenderingContext.FillPolygon(mPredictedPolygon, BrushColor, Ink.Rendering.BlendMode.Max);
         }
 
-        public override Rect DoRenderSelectedStrokes(RenderingContext renderingCtx, IEnumerable<Identifier> selectedStrokeIds)
+        public override void DoRenderSelectedStrokes(RenderingContext renderingCtx, IEnumerable<Identifier> selectedStrokeIds)
         {
             if (!IsSelecting)
             {
@@ -305,8 +308,6 @@ namespace Wacom
 
                 manipulationTool.DestRect = rect;
                 manipulationTool.SourceRect = rect;
-
-                return rect;
             }
 
             lock (mDryStrokeLock)
@@ -326,14 +327,10 @@ namespace Wacom
                         rect = polyBounds;
                     else
                         rect.Union(polyBounds);
-
-                    manipulationTool.DestRect = rect;
-                    manipulationTool.SourceRect = rect;
-
                 }
-
+                manipulationTool.SourceRect = rect;
+                manipulationTool.DestRect = rect;
             }
-            return rect;
         }
 
         /// <summary>
@@ -508,6 +505,7 @@ namespace Wacom
 
         private void OnToolTranslate(object sender, EventArgs args)
         {
+            //mRenderer.RenderSelectedStrokes(mSelectTool.SelectedStrokes);
             mRenderer.RenderBackbuffer();
             mRenderer.PresentGraphics();
         }
@@ -534,7 +532,7 @@ namespace Wacom
                     mSpatialModel.Add(stroke);
                 }
 
-                mRenderer.InvokeRenderSelected(mSelectTool.SelectedStrokes); 
+                //mRenderer.InvokeRenderSelected(mSelectTool.SelectedStrokes); 
             }
         }
 
@@ -551,13 +549,12 @@ namespace Wacom
 
             DecodedVectorInkBuilder decodedVectorInkBuilder = new DecodedVectorInkBuilder();
 
-            IEnumerator<InkNode> enumerator = inkDataModel.InkTree.Root.GetRecursiveEnumerator();
-
-            while (enumerator.MoveNext())
+            for (var enumerator = inkDataModel.InkTree.Root.GetRecursiveEnumerator(); enumerator.MoveNext(); )
             {
                 if (enumerator.Current is StrokeNode strokeNode)
                 {
-                    var vectorInkStroke = CreateDryStroke(decodedVectorInkBuilder, strokeNode.Stroke, inkDataModel);
+                    // Use number of strokes  already added as zindex
+                    var vectorInkStroke = CreateDryStroke(decodedVectorInkBuilder, dryStrokes.Count, strokeNode.Stroke, inkDataModel);
                     dryStrokes.Add(vectorInkStroke);
                     mSpatialModel.Add(vectorInkStroke);
 
@@ -573,13 +570,13 @@ namespace Wacom
             return dryStrokes;
         }
 
-        private VectorInkStroke CreateDryStroke(DecodedVectorInkBuilder decodedVectorInkBuilder, Stroke stroke, InkModel inkDataModel)
+        private VectorInkStroke CreateDryStroke(DecodedVectorInkBuilder decodedVectorInkBuilder, long zindex, Stroke stroke, InkModel inkDataModel)
         {
             inkDataModel.Brushes.TryGetBrush(stroke.Style.BrushUri, out Wacom.Ink.Serialization.Model.Brush brush);
 
             if (brush is Wacom.Ink.Serialization.Model.VectorBrush vectorBrush)
             {
-                return CreateDryStrokeFromVectorBrush(decodedVectorInkBuilder, vectorBrush, stroke);
+                return CreateDryStrokeFromVectorBrush(decodedVectorInkBuilder, zindex, vectorBrush, stroke);
             }
             else if (brush is RasterBrush rasterBrush)
             {
@@ -591,7 +588,7 @@ namespace Wacom
             }
         }
 
-        private VectorInkStroke CreateDryStrokeFromVectorBrush(DecodedVectorInkBuilder decodedVectorInkBuilder, Wacom.Ink.Serialization.Model.VectorBrush vectorBrush, Stroke stroke)
+        private VectorInkStroke CreateDryStrokeFromVectorBrush(DecodedVectorInkBuilder decodedVectorInkBuilder, long zindex, Wacom.Ink.Serialization.Model.VectorBrush vectorBrush, Stroke stroke)
         {
             Wacom.Ink.Geometry.VectorBrush vb;
 
@@ -616,7 +613,7 @@ namespace Wacom
             }
             var pipelineData = decodedVectorInkBuilder.AddWholePath(stroke.Spline, stroke.Layout, vb);
 
-            return new VectorInkStroke(stroke, vb, pipelineData);
+            return new VectorInkStroke(stroke, zindex, vb, pipelineData);
         }
 
         private class DecodedVectorInkBuilder

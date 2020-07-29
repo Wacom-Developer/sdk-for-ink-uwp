@@ -130,7 +130,7 @@ namespace Wacom
         /// </summary>
         /// <param name="renderingContext">RenderingContext to draw to</param>
         /// <param name="o">Cached stroke (as object)</param>
-        public override void DoRenderStroke(RenderingContext renderingContext, object o, bool translationLayerPainted)
+        public override void DoRenderStroke(RenderingContext renderingContext, object o)
         {
             RasterInkStroke stroke = (RasterInkStroke)o;
             renderingContext.DrawParticleStroke(stroke.Path, stroke.StrokeConstants, stroke.ParticleBrush, Ink.Rendering.BlendMode.SourceOver, stroke.RandomSeed);
@@ -195,7 +195,7 @@ namespace Wacom
                 context.SetTarget(mRenderer.CurrentStrokeLayer);
                 context.ClearColor(Colors.Transparent);
 
-                DoRenderStroke(context, stroke, mRenderer.TranslationLayerPainted);
+                DoRenderStroke(context, stroke);
 
                 // Blend stroke to Scene Layer
                 context.SetTarget(mRenderer.SceneLayer);

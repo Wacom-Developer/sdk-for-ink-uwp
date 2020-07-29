@@ -25,9 +25,11 @@ namespace Wacom
         public PointerDeviceType PointerDeviceType { get; set; }
         private VectorSplineInkBuilder mInkBuilder = new VectorSplineInkBuilder();
 
-        public VectorInkStroke(Stroke stroke, Wacom.Ink.Geometry.VectorBrush vectorBrush, PipelineData pipelineData)
+        public VectorInkStroke(Stroke stroke, long zindex, Wacom.Ink.Geometry.VectorBrush vectorBrush, PipelineData pipelineData)
         {
             Id = stroke.Id;
+            ZIndex = zindex;
+
             PathPointProperties ppp = stroke.Style.PathPointProperties;
             Color = MediaColor.FromArgb(
                             ppp.Alpha.HasValue ? (byte)(ppp.Alpha * 255.0f) : byte.MinValue,
@@ -44,14 +46,14 @@ namespace Wacom
             SensorDataMappings = stroke.SensorDataMappings;
             SensorDataId = stroke.SensorDataId;
 
-			Attributes attribs = new Attributes(Color);
+            Attributes attribs = new Attributes(Color);
 
-			if (ppp.Size.HasValue)
-			{
-				attribs.Size = ppp.Size.Value;
-			}
+            if (ppp.Size.HasValue)
+            {
+                attribs.Size = ppp.Size.Value;
+            }
 
-			Constants = attribs;
+            Constants = attribs;
         }
 
         public VectorInkStroke(PointerDeviceType pointerDeviceType, VectorInkBuilder inkBuilder, MediaColor color, List<PolygonVertices> mergedPolygons, Ink.Geometry.VectorBrush vectorBrush, Identifier sensorDataId)
@@ -70,12 +72,13 @@ namespace Wacom
             VectorBrush = vectorBrush;
             SimplPoly = mergedPolygons;
 
-			Constants = new Attributes(Color);
+            Constants = new Attributes(Color);
         }
 
         public VectorInkStroke(Spline newSpline, IInkStroke originalStroke, int firstPointIndex, int pointsCount)
         {
             Id = Identifier.FromNewGuid();
+            ZIndex = ((VectorInkStroke)originalStroke).ZIndex;
             
             // Cloning is needed, otherwise the spatial data is corrupted
             Spline = newSpline;
@@ -97,7 +100,7 @@ namespace Wacom
                 SensorDataMappings = newSplineSensorDataMappings;
             }
 
-			Constants = originalStroke.Constants;
+            Constants = originalStroke.Constants;
 
             IStrokeAttributes originConstants = originalStroke.Constants;
             Color.R = (byte)(originConstants.Red * 255);
@@ -127,7 +130,7 @@ namespace Wacom
 
         public Wacom.Ink.Geometry.VectorBrush VectorBrush { get; set; }
 
-		public IStrokeAttributes Constants { get; } 
+        public IStrokeAttributes Constants { get; } 
 
 
         public uint SensorDataOffset { get; set; }
