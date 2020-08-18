@@ -437,16 +437,34 @@ namespace Wacom
         public override void OnPressed(UIElement uiElement, PointerRoutedEventArgs args)
         {
             var currentPt = args.GetCurrentPoint(uiElement).Position;
-            mIsTranslating = CurrentPointIntersectsSourceRect(currentPt);
+            var ptInDest = DestRect.Contains(currentPt);
+
+            // If there is currently a selection, but this new point is outside of it,
+            // complete previous translation before starting a new selection
+            if (mIsTranslating && !ptInDest)
+            {
+                TranslateFinished?.Invoke(this, Translation);
+            }
+
+            // If there is currently a selection and this new point is inside of it,
+            // we are recommencing previous translation
+            bool continueTranslation = mIsTranslating && ptInDest;
+
+            // If point is in destination rect, we are (re)starting a translation
+            mIsTranslating = ptInDest;
 
             if (mIsTranslating)
             {
-                mStartPosition = currentPt;
-                mPrevPosition = mStartPosition;
+                if (!continueTranslation)
+                { 
+                    mStartPosition = currentPt;
+                    mPrevPosition = mStartPosition;
+                }
                 OnTranslate?.Invoke(this, null);
             }
             else
             {
+                // No translating, initiate stroke drawing to make selection
                 base.OnPressed(uiElement, args);
             }
         }
@@ -477,50 +495,50 @@ namespace Wacom
         {
             if (mIsTranslating)
             {
-                Matrix3x2 translation = Matrix3x2.Identity;
-
-                var pt = args.GetCurrentPoint(uiElement).Position;
-                if (!mStrokeHandler.TransformationMatrix.IsIdentity)
-                {
-                    bool res = Matrix3x2.Invert(mStrokeHandler.TransformationMatrix, out Matrix3x2 modelTransformationMatrix);
-
-                    if (!res)
-                    {
-                        throw new InvalidOperationException("Transform matrix could not be inverted.");
-                    }
-
-                    Vector2 currentPointPos = new Vector2((float)pt.X, (float)pt.Y);
-                    Vector2 startPos = new Vector2((float)mStartPosition.X, (float)mStartPosition.Y);
-                    Vector2 modelCurrentPointPos = Vector2.Transform(currentPointPos, modelTransformationMatrix);
-                    Vector2 modelStartPos = Vector2.Transform(startPos, modelTransformationMatrix);
-
-                    double dX = modelCurrentPointPos.X - modelStartPos.X;
-                    double dY = modelCurrentPointPos.Y - modelStartPos.Y;
-                    translation = Matrix3x2.CreateTranslation((float)dX, (float)dY);
-                }
-                else
-                {
-                    double dX = pt.X - mStartPosition.X;
-                    double dY = pt.Y - mStartPosition.Y;
-                    translation = Matrix3x2.CreateTranslation((float)dX, (float)dY);
-                }
-
-                TranslateFinished?.Invoke(this, translation);
+                Translation = GetTranslation(args.GetCurrentPoint(uiElement).Position);
+                //SourceRect = DestRect;
+                //TranslateFinished?.Invoke(this, translation);
             }
             else
             {
                 base.OnReleased(uiElement, args);
             }
 
-            mIsTranslating = false;
+            //mIsTranslating = false;
         }
 
-        private bool CurrentPointIntersectsSourceRect(Point currentPoint)
-        {
-            if (SourceRect.IsEmpty)
-                return false;
+        public Matrix3x2 Translation { get; private set; }
 
-            return SourceRect.Contains(currentPoint);
+        private Matrix3x2 GetTranslation(Point pt)
+        {
+            Matrix3x2 translation;
+            
+            if (!mStrokeHandler.TransformationMatrix.IsIdentity)
+            {
+                bool res = Matrix3x2.Invert(mStrokeHandler.TransformationMatrix, out Matrix3x2 modelTransformationMatrix);
+
+                if (!res)
+                {
+                    throw new InvalidOperationException("Transform matrix could not be inverted.");
+                }
+
+                Vector2 currentPointPos = new Vector2((float)pt.X, (float)pt.Y);
+                Vector2 startPos = new Vector2((float)mStartPosition.X, (float)mStartPosition.Y);
+                Vector2 modelCurrentPointPos = Vector2.Transform(currentPointPos, modelTransformationMatrix);
+                Vector2 modelStartPos = Vector2.Transform(startPos, modelTransformationMatrix);
+
+                double dX = modelCurrentPointPos.X - modelStartPos.X;
+                double dY = modelCurrentPointPos.Y - modelStartPos.Y;
+                translation = Matrix3x2.CreateTranslation((float)dX, (float)dY);
+            }
+            else
+            {
+                double dX = pt.X - mStartPosition.X;
+                double dY = pt.Y - mStartPosition.Y;
+                translation = Matrix3x2.CreateTranslation((float)dX, (float)dY);
+            }
+
+            return translation;
         }
 
         public override PathPointLayout GetLayout(Windows.Devices.Input.PointerDeviceType deviceType)

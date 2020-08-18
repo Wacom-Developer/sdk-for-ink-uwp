@@ -81,7 +81,14 @@ namespace Wacom
 
             WorkItemHandler workItemHandler = new WorkItemHandler((IAsyncAction action) =>
             {
-                mSpatialModel.StartProcessingJobs();
+                try
+                {
+                    mSpatialModel.StartProcessingJobs();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.WriteLine($"Exception: {ex.Message}");
+                }
             });
 
             mSpatialModelLoopWorker = Windows.System.Threading.ThreadPool.RunAsync(workItemHandler, WorkItemPriority.High, WorkItemOptions.TimeSliced);
@@ -151,6 +158,7 @@ namespace Wacom
         {
             if (IsSelecting)
             {
+                OnToolTranslateFinished(this, (mSelectTool as VectorManipulationTool).Translation);
                 mActiveTool = null;
                 BrushColor = mSavedColor;
                 mSelectTool = null;
@@ -170,7 +178,7 @@ namespace Wacom
         /// </summary>
         /// <param name="renderingContext">RenderingContext to draw to</param>
         /// <param name="o">Cached stroke (as object)</param>
-        public override void DoRenderStroke(RenderingContext renderingContext, object o, bool translationLayerPainted)
+        public override void DoRenderStroke(RenderingContext renderingContext, object o)
         {
             VectorInkStroke stroke = (VectorInkStroke)o;
             renderingContext.FillPolygon(stroke.Polygon, stroke.Color, Ink.Rendering.BlendMode.SourceOver);
@@ -199,10 +207,7 @@ namespace Wacom
             }
             else
             {
-                foreach (var stroke in mDryStrokes)
-                {
-                    mSpatialModel.Remove(stroke.Id);
-                }
+                mSpatialModel.Reset();
                 mDryStrokes.Clear();
             }
             mSerializer = new Serializer();
@@ -226,7 +231,8 @@ namespace Wacom
         public override InkModel Serialize()
         {
             mSerializer.Init();
-            foreach (var stroke in mDryStrokes)
+            var orderedStrokes = mDryStrokes.OrderBy((stroke) => stroke.ZIndex);
+            foreach (var stroke in orderedStrokes)
             {
                 mSerializer.EncodeStroke(stroke);
             }
@@ -237,7 +243,8 @@ namespace Wacom
         {
             lock (mDryStrokeLock)
             {
-                foreach (var stroke in mDryStrokes)
+                var orderedStrokes = mDryStrokes.OrderBy((stroke) => stroke.ZIndex);
+                foreach (var stroke in orderedStrokes)
                 {
                     if (excluded == null || !excluded.Contains(stroke.Id))
                     {
@@ -245,7 +252,7 @@ namespace Wacom
                         context.SetTarget(mRenderer.CurrentStrokeLayer);
                         context.ClearColor(Colors.Transparent);
 
-                        DoRenderStroke(context, stroke, mRenderer.TranslationLayerPainted);
+                        DoRenderStroke(context, stroke);
 
                         // Blend stroke to Scene Layer
                         context.SetTarget(mRenderer.SceneLayer);
@@ -286,7 +293,7 @@ namespace Wacom
             mRenderer.RenderingContext.FillPolygon(mPredictedPolygon, BrushColor, Ink.Rendering.BlendMode.Max);
         }
 
-        public override Rect DoRenderSelectedStrokes(RenderingContext renderingCtx, IEnumerable<Identifier> selectedStrokeIds)
+        public override void DoRenderSelectedStrokes(RenderingContext renderingCtx, IEnumerable<Identifier> selectedStrokeIds)
         {
             if (!IsSelecting)
             {
@@ -301,8 +308,6 @@ namespace Wacom
 
                 manipulationTool.DestRect = rect;
                 manipulationTool.SourceRect = rect;
-
-                return rect;
             }
 
             lock (mDryStrokeLock)
@@ -311,20 +316,21 @@ namespace Wacom
                 {
                     var dryStroke = mDryStrokes.Find(x => x.Equals(id));
 
+                    if (dryStroke == null)
+                    {
+                        continue;
+                    }
+
                     Rect polyBounds = renderingCtx.FillPolygon(dryStroke.Polygon, dryStroke.Color, Wacom.Ink.Rendering.BlendMode.SourceOver);
 
                     if (rect.IsEmpty)
                         rect = polyBounds;
                     else
                         rect.Union(polyBounds);
-
-                    manipulationTool.DestRect = rect;
-                    manipulationTool.SourceRect = rect;
-
                 }
-
+                manipulationTool.SourceRect = rect;
+                manipulationTool.DestRect = rect;
             }
-            return rect;
         }
 
         /// <summary>
@@ -333,9 +339,11 @@ namespace Wacom
         /// <param name="inkDocument"></param>
         public override void LoadInk(InkModel inkDocument)
         {
+            mSpatialModel.Reset();
+            mSerializer = new Serializer();
+
             base.LoadInk(inkDocument);
             mDryStrokes = new List<VectorInkStroke>(RecreateDryStrokes(inkDocument));
-            
         }
 
         #endregion
@@ -393,6 +401,10 @@ namespace Wacom
                 TransformUtils.TransformPolysXY(mergedPolygons, viewToModelTransformationMatrix);
             }
 
+            // NOTE: If ManipulationMode is PartialStroke, affected strokes are deleted and new strokes created
+            //       for selected and non-selected portions. This occurs BEFORE any manipulation takes place.
+            //       Reverting to previous state in the event of no manipulation taking place requires 
+            //       undo functionality (delete added strokes, restore deleted strokes)
             mSpatialModel.Select(mergedPolygons[0], mSelectTool.ManipulationMode);
         }
 
@@ -493,6 +505,7 @@ namespace Wacom
 
         private void OnToolTranslate(object sender, EventArgs args)
         {
+            //mRenderer.RenderSelectedStrokes(mSelectTool.SelectedStrokes);
             mRenderer.RenderBackbuffer();
             mRenderer.PresentGraphics();
         }
@@ -505,6 +518,11 @@ namespace Wacom
                 {
                     VectorInkStroke stroke = mDryStrokes.Find(x => x.Equals(selectedId));
 
+                    if (stroke == null)
+                    {
+                        continue;
+                    }
+
                     Spline transformedSpline = TransformUtils.TransformSplineXY(stroke.Spline, stroke.Layout, transform);
 
                     mSpatialModel.Remove(selectedId);
@@ -514,7 +532,7 @@ namespace Wacom
                     mSpatialModel.Add(stroke);
                 }
 
-                mRenderer.InvokeRenderSelected(mSelectTool.SelectedStrokes); 
+                //mRenderer.InvokeRenderSelected(mSelectTool.SelectedStrokes); 
             }
         }
 
@@ -531,30 +549,34 @@ namespace Wacom
 
             DecodedVectorInkBuilder decodedVectorInkBuilder = new DecodedVectorInkBuilder();
 
-            foreach (var stroke in inkDataModel.Strokes)
+            for (var enumerator = inkDataModel.InkTree.Root.GetRecursiveEnumerator(); enumerator.MoveNext(); )
             {
-                var vectorInkStroke = CreateDryStroke(decodedVectorInkBuilder, stroke, inkDataModel);
-                dryStrokes.Add(vectorInkStroke);
-                mSpatialModel.Add(vectorInkStroke);
-
-                bool res = inkDataModel.SensorData.GetSensorData(vectorInkStroke.SensorDataId, out SensorData sensorData);
-
-                if (res)
+                if (enumerator.Current is StrokeNode strokeNode)
                 {
-                    mSerializer.LoadSensorDataFromModel(inkDataModel, sensorData);
+                    // Use number of strokes  already added as zindex
+                    var vectorInkStroke = CreateDryStroke(decodedVectorInkBuilder, dryStrokes.Count, strokeNode.Stroke, inkDataModel);
+                    dryStrokes.Add(vectorInkStroke);
+                    mSpatialModel.Add(vectorInkStroke);
+
+                    bool res = inkDataModel.SensorData.GetSensorData(vectorInkStroke.SensorDataId, out SensorData sensorData);
+
+                    if (res)
+                    {
+                        mSerializer.LoadSensorDataFromModel(inkDataModel, sensorData);
+                    } 
                 }
             }
 
             return dryStrokes;
         }
 
-        private VectorInkStroke CreateDryStroke(DecodedVectorInkBuilder decodedVectorInkBuilder, Stroke stroke, InkModel inkDataModel)
+        private VectorInkStroke CreateDryStroke(DecodedVectorInkBuilder decodedVectorInkBuilder, long zindex, Stroke stroke, InkModel inkDataModel)
         {
             inkDataModel.Brushes.TryGetBrush(stroke.Style.BrushUri, out Wacom.Ink.Serialization.Model.Brush brush);
 
             if (brush is Wacom.Ink.Serialization.Model.VectorBrush vectorBrush)
             {
-                return CreateDryStrokeFromVectorBrush(decodedVectorInkBuilder, vectorBrush, stroke);
+                return CreateDryStrokeFromVectorBrush(decodedVectorInkBuilder, zindex, vectorBrush, stroke);
             }
             else if (brush is RasterBrush rasterBrush)
             {
@@ -566,12 +588,32 @@ namespace Wacom
             }
         }
 
-        private VectorInkStroke CreateDryStrokeFromVectorBrush(DecodedVectorInkBuilder decodedVectorInkBuilder, Wacom.Ink.Serialization.Model.VectorBrush vectorBrush, Stroke stroke)
+        private VectorInkStroke CreateDryStrokeFromVectorBrush(DecodedVectorInkBuilder decodedVectorInkBuilder, long zindex, Wacom.Ink.Serialization.Model.VectorBrush vectorBrush, Stroke stroke)
         {
-            Wacom.Ink.Geometry.VectorBrush vb = new Wacom.Ink.Geometry.VectorBrush(vectorBrush.BrushPolygons.ToArray());
+            Wacom.Ink.Geometry.VectorBrush vb;
+
+            if (vectorBrush.BrushPolygons.Count > 0)
+            {
+                vb = new Wacom.Ink.Geometry.VectorBrush(vectorBrush.BrushPolygons.ToArray());
+            }
+            else if (vectorBrush.BrushPrototypeURIs.Count > 0)
+            {
+                List<BrushPolygon> brushPolygons = new List<BrushPolygon>(vectorBrush.BrushPrototypeURIs.Count);
+
+                foreach (var uri in vectorBrush.BrushPrototypeURIs)
+                {
+                    brushPolygons.Add(new BrushPolygon(uri.MinScale, ShapeUriResolver.ResolveShape(uri.ShapeUri)));
+                }
+
+                vb = new Wacom.Ink.Geometry.VectorBrush(brushPolygons.ToArray());
+            }
+            else
+            {
+                throw new ArgumentException("Missing vector brush information! Expected BrushPolygons, BrushPolyhedrons or BrushPrototypeURIs.");
+            }
             var pipelineData = decodedVectorInkBuilder.AddWholePath(stroke.Spline, stroke.Layout, vb);
 
-            return new VectorInkStroke(stroke, vectorBrush, pipelineData);
+            return new VectorInkStroke(stroke, zindex, vb, pipelineData);
         }
 
         private class DecodedVectorInkBuilder

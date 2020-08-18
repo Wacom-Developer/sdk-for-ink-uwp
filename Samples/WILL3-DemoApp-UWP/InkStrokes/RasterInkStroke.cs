@@ -32,7 +32,16 @@ namespace Wacom
 
         public RasterBrush RasterBrush { get; set; }
 
-        public RasterInkStroke(RasterInkBuilder inkBuilder, PointerDeviceType pointerDeviceType, List<float> points, uint seed, RasterBrush rasterBrush, StrokeConstants StrokeParams, Identifier sensorDataId)
+        public ParticleBrush ParticleBrush { get; set; }
+
+        public RasterInkStroke(RasterInkBuilder inkBuilder, 
+            PointerDeviceType pointerDeviceType, 
+            List<float> points, 
+            uint seed, 
+            RasterBrush rasterBrush,
+            ParticleBrush particleBrush,
+            StrokeConstants StrokeParams, 
+            Identifier sensorDataId)
         {
             Id = Identifier.FromNewGuid();
 
@@ -47,20 +56,20 @@ namespace Wacom
             StrokeConstants = StrokeParams;
             SensorDataId = sensorDataId;
             RasterBrush = rasterBrush;
+            ParticleBrush = particleBrush;
 
             // Cloning is needed, otherwise the spatial data is corrupted
             Spline = inkBuilder.SplineProducer.AllData.Clone();
             Layout = inkBuilder.Layout;
-
-            Trace.WriteLine($"WILL3 RasterInkStroke {Id.ToString()} {points.Count} {rasterBrush.Name}");
         }
 
-        public RasterInkStroke(Stroke stroke, RasterBrush rasterBrush, ParticleList particleList)
+        public RasterInkStroke(Stroke stroke, RasterBrush rasterBrush, ParticleList particleList, ParticleBrush particleBrush)
         {
             Id = stroke.Id;
             Path = particleList;
             RandomSeed = stroke.Style.RandomSeed;
             RasterBrush = rasterBrush;
+            ParticleBrush = particleBrush;
 
             PathPointProperties ppp = stroke.Style.PathPointProperties;
 
@@ -76,7 +85,6 @@ namespace Wacom
 
             Spline = stroke.Spline;
             Layout = stroke.Layout;
-            Trace.WriteLine($"WILL3 RasterInkStroke {Id.ToString()} {rasterBrush.Name}");
         }
 
     }

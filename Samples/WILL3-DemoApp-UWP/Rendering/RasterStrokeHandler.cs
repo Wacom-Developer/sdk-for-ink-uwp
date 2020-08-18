@@ -4,9 +4,6 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using Windows.Devices.Input;
 using Windows.Foundation;
-using Windows.Graphics.Imaging;
-using Windows.Storage;
-using Windows.Storage.Streams;
 using Windows.UI;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Input;
@@ -133,10 +130,10 @@ namespace Wacom
         /// </summary>
         /// <param name="renderingContext">RenderingContext to draw to</param>
         /// <param name="o">Cached stroke (as object)</param>
-        public override void DoRenderStroke(RenderingContext renderingContext, object o, bool translationLayerPainted)
+        public override void DoRenderStroke(RenderingContext renderingContext, object o)
         {
             RasterInkStroke stroke = (RasterInkStroke)o;
-            renderingContext.DrawParticleStroke(stroke.Path, stroke.StrokeConstants, mActiveTool.Brush, Ink.Rendering.BlendMode.SourceOver, stroke.RandomSeed);
+            renderingContext.DrawParticleStroke(stroke.Path, stroke.StrokeConstants, stroke.ParticleBrush, Ink.Rendering.BlendMode.SourceOver, stroke.RandomSeed);
         }
 
         /// <summary>
@@ -172,6 +169,7 @@ namespace Wacom
                         points,
                         mStartRandomSeed,
                         CreateSerializationBrush($"will://examples/brushes/{Guid.NewGuid().ToString()}"),
+                        mActiveTool.Brush,
                         mStrokeConstants.Clone(),
                         mSerializer.AddSensorData(deviceType, InkBuilder.GetPointerDataList()));
                     mDryStrokes.Add(dryStroke);
@@ -197,7 +195,7 @@ namespace Wacom
                 context.SetTarget(mRenderer.CurrentStrokeLayer);
                 context.ClearColor(Colors.Transparent);
 
-                DoRenderStroke(context, stroke, mRenderer.TranslationLayerPainted);
+                DoRenderStroke(context, stroke);
 
                 // Blend stroke to Scene Layer
                 context.SetTarget(mRenderer.SceneLayer);
@@ -258,6 +256,8 @@ namespace Wacom
         /// <param name="inkDocument"></param>
         public override void LoadInk(InkModel inkDocument)
         {
+            mSerializer = new Serializer();
+
             base.LoadInk(inkDocument);
             mDryStrokes = new List<RasterInkStroke>(RecreateDryStrokes(inkDocument));
         }
@@ -289,7 +289,6 @@ namespace Wacom
                 default:
                     throw new Exception("Unknown brush type");
             }
-            Trace.WriteLine($"WILL3 New ActiveTool {brushStyle}");
             mActiveTool.PointsAdded += OnPointsAdded;
             RasterInkBuilder.LayoutUpdated += InkBuilder_LayoutUpdated;
         }
@@ -331,16 +330,21 @@ namespace Wacom
 
             DecodedRasterInkBuilder decodedRasterInkBuilder = new DecodedRasterInkBuilder();
 
-            foreach (var stroke in inkDataModel.Strokes)
+            IEnumerator<InkNode> enumerator = inkDataModel.InkTree.Root.GetRecursiveEnumerator();
+
+            while (enumerator.MoveNext())
             {
-                var dryStroke = CreateDryStroke(decodedRasterInkBuilder, stroke, inkDataModel);
-                dryStrokes.Add(dryStroke);
-
-                bool res = inkDataModel.SensorData.GetSensorData(dryStroke.SensorDataId, out SensorData sensorData);
-
-                if (res)
+                if (enumerator.Current is StrokeNode strokeNode)
                 {
-                    mSerializer.LoadSensorDataFromModel(inkDataModel, sensorData);
+                    var dryStroke = CreateDryStroke(decodedRasterInkBuilder, strokeNode.Stroke, inkDataModel);
+                    dryStrokes.Add(dryStroke);
+
+                    bool res = inkDataModel.SensorData.GetSensorData(dryStroke.SensorDataId, out SensorData sensorData);
+
+                    if (res)
+                    {
+                        mSerializer.LoadSensorDataFromModel(inkDataModel, sensorData);
+                    } 
                 }
             }
 
@@ -376,7 +380,16 @@ namespace Wacom
             ParticleList particleList = new ParticleList();
             particleList.Assign(points, channelMask);
 
-            RasterInkStroke dryStroke = new RasterInkStroke(stroke, rasterBrush, particleList);
+            ParticleBrush particleBrush = new ParticleBrush
+            {
+                FillTexture = mGraphics.CreateTexture(Task.Run(async () => await Utils.GetPixelDataAsync(rasterBrush.FillTexture)).Result),
+                FillTileSize = new Size(rasterBrush.FillWidth, rasterBrush.FillHeight),
+                RotationMode = (ParticleRotationMode)rasterBrush.RotationMode,
+                Scattering = rasterBrush.Scattering,
+                ShapeTexture = mGraphics.CreateTexture(Task.Run(async () => await Utils.GetPixelDataAsync(rasterBrush.ShapeTextures[0])).Result)
+            };
+
+            RasterInkStroke dryStroke = new RasterInkStroke(stroke, rasterBrush, particleList, particleBrush);
 
             return dryStroke;
         }

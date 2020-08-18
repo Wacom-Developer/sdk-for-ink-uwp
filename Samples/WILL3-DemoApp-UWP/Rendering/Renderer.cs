@@ -55,7 +55,7 @@ namespace Wacom
 
         public Layer TranslationLayer { get; private set; }
 
-        public bool TranslationLayerPainted { get; private set; } = false;
+        //public bool TranslationLayerPainted { get; private set; } = false;
 
         #endregion
 
@@ -199,6 +199,11 @@ namespace Wacom
         /// </summary>
         private void OnSizeChanged(object sender, SizeChangedEventArgs e)
         {
+            if (StrokeHandler.IsSelecting)
+            {
+                StrokeHandler.StopSelectionMode();
+            }
+
             // Reinitialize layers
             RenderingContext.SetTarget(null);
 
@@ -210,16 +215,7 @@ namespace Wacom
             ClearLayers();
 
             // Redraw saved strokes
-            if (StrokeHandler.IsSelecting)
-            {
-                RenderSelectedStrokes(StrokeHandler.SelectedStrokes);
-                RedrawAllStrokes(StrokeHandler.SelectedStrokes, null);
-
-            }
-            else
-            {
-                RedrawAllStrokes(null, null);
-            }
+            RedrawAllStrokes(null, null);
         }
 
         #endregion
@@ -231,7 +227,7 @@ namespace Wacom
 
             RenderingContext.DrawLayer(SceneLayer, null, Wacom.Ink.Rendering.BlendMode.Copy);
 
-            if (StrokeHandler.IsSelecting && TranslationLayerPainted)
+            if (StrokeHandler.IsSelecting /*&& TranslationLayerPainted*/)
             {
                 StrokeHandler.DrawTranslation(RenderingContext, TranslationLayer);
             }
@@ -281,7 +277,7 @@ namespace Wacom
             var ignored = mSwapChainPanel.Dispatcher.RunAsync(CoreDispatcherPriority.High, () =>
             {
                 ClearLayers();
-                TranslationLayerPainted = false;
+                //TranslationLayerPainted = false;
                 RedrawAllStrokes(null, null);
             });
         }
@@ -346,7 +342,7 @@ namespace Wacom
         public void RedrawAllStrokes(IEnumerable<Identifier> excluded, Rect? clipRect)
         {
             RenderingContext.SetTarget(AllStrokesLayer, clipRect);
-            RenderingContext.ClearColor(Colors.Transparent);
+            RenderingContext.ClearColor(StrokeHandler.BackgroundColor);
 
             StrokeHandler.RenderAllStrokes(RenderingContext, excluded, clipRect);
 
@@ -373,15 +369,15 @@ namespace Wacom
             RenderingContext.TransformMatrix = StrokeHandler.TransformationMatrix;
 
             // Draw the selected strokes
-            Rect rect = StrokeHandler.DoRenderSelectedStrokes(RenderingContext, selectedStrokeIds);
+            StrokeHandler.DoRenderSelectedStrokes(RenderingContext, selectedStrokeIds);
 
             if (selectedStrokeIds.Count() == 0)
             {
-                TranslationLayerPainted = false;
+                //TranslationLayerPainted = false;
             }
             else
             {
-                TranslationLayerPainted = true;
+                //TranslationLayerPainted = false;//~~~ true;
             }
             RenderingContext.TransformMatrix = Matrix3x2.Identity;
         }
