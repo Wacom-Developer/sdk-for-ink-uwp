@@ -181,7 +181,7 @@
       <Version>6.2.10</Version>
     </PackageReference>
     <PackageReference Include="Wacom.Ink.Rendering.UWP">
-      <Version>3.0.8</Version>
+      <Version>3.0.9</Version>
     </PackageReference>
     <PackageReference Include="Win2D.uwp">
       <Version>1.25.0</Version>
