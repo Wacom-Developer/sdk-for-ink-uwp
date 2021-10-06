@@ -20,7 +20,7 @@ namespace Wacom
         public Identifier Id { get; set; }
 
         public Spline Spline { get; set; }
-        public PathPointLayout Layout { get; set; }
+        //public PathPointLayout Layout { get; set; }
 
         public ParticleList Path { get; }
         public StrokeConstants StrokeConstants { get; }
@@ -36,7 +36,7 @@ namespace Wacom
 
         public RasterInkStroke(RasterInkBuilder inkBuilder, 
             PointerDeviceType pointerDeviceType, 
-            List<float> points, 
+            Path points, 
             uint seed, 
             RasterBrush rasterBrush,
             ParticleBrush particleBrush,
@@ -47,10 +47,8 @@ namespace Wacom
 
             PointerDeviceType = pointerDeviceType;
 
-            uint channelMask = (uint)inkBuilder.SplineInterpolator.InterpolatedSplineLayout.ChannelMask;
-
             Path = new ParticleList();
-            Path.Assign(points, channelMask);
+            Path.Assign(points, (uint)points.LayoutMask);
 
             RandomSeed = seed;
             StrokeConstants = StrokeParams;
@@ -59,15 +57,15 @@ namespace Wacom
             ParticleBrush = particleBrush;
 
             // Cloning is needed, otherwise the spatial data is corrupted
-            Spline = inkBuilder.SplineProducer.AllData.Clone();
-            Layout = inkBuilder.Layout;
+            Spline = inkBuilder.SplineAccumulator.Accumulated.Clone();
+            //Layout = inkBuilder.Layout;
         }
 
         public RasterInkStroke(Stroke stroke, RasterBrush rasterBrush, ParticleList particleList, ParticleBrush particleBrush)
         {
             Id = stroke.Id;
             Path = particleList;
-            RandomSeed = stroke.Style.RandomSeed;
+            RandomSeed = stroke.RandomSeed;
             RasterBrush = rasterBrush;
             ParticleBrush = particleBrush;
 
@@ -76,15 +74,15 @@ namespace Wacom
             StrokeConstants = new StrokeConstants
             {
                 Color = MediaColor.FromArgb(
-                            ppp.Alpha.HasValue ? (byte)(ppp.Alpha * 255.0f) : byte.MinValue,
-                            ppp.Red.HasValue ? (byte)(ppp.Red * 255.0f) : byte.MinValue,
-                            ppp.Green.HasValue ? (byte)(ppp.Green * 255.0f) : byte.MinValue,
-                            ppp.Blue.HasValue ? (byte)(ppp.Blue * 255.0f) : byte.MinValue)
+                    (byte)(ppp.Alpha * 255.0f),
+                    (byte)(ppp.Red * 255.0f),
+                    (byte)(ppp.Green * 255.0f),
+                    (byte)(ppp.Blue * 255.0f))
             };
             SensorDataId = stroke.SensorDataId;
 
-            Spline = stroke.Spline;
-            Layout = stroke.Layout;
+            Spline = stroke.Spline.ToSpline();
+            //Layout = stroke.Layout;
         }
 
     }

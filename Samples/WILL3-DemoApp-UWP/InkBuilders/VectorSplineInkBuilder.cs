@@ -8,7 +8,7 @@ using Wacom.Ink.Geometry;
 namespace Wacom
 {
 	/// <summary>
-	/// This ink biulder works with splines in model coordinates.
+	/// This ink builder works with splines in model coordinates.
 	/// </summary>
 	public class VectorSplineInkBuilder
 	{
@@ -16,10 +16,10 @@ namespace Wacom
 		private PolygonMerger mPolygonMerger = new PolygonMerger();
 		private PolygonSimplifier mPolygonSimplifier = new PolygonSimplifier(0.1f);
 
-		public PipelineData AddWholePath(Spline path, PathPointLayout layout, Wacom.Ink.Geometry.VectorBrush vectorBrush)
+		public PipelineData AddWholePath(Spline path, Wacom.Ink.Geometry.VectorBrush vectorBrush)
 		{
-			var splineInterpolator = new CurvatureBasedInterpolator(layout);
-			var brushApplier = new BrushApplier(layout, vectorBrush);
+			var splineInterpolator = new CurvatureBasedInterpolator();
+			var brushApplier = new BrushApplier(vectorBrush);
 
 			var points = splineInterpolator.Add(true, true, path, null);
 

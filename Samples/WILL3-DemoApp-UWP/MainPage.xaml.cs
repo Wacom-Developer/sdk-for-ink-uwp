@@ -15,6 +15,7 @@ using Wacom.Ink.Serialization;
 
 // Alias to avoid ambiguity with Wacom.Ink.Serialization.Model.Color
 using MediaColor = Windows.UI.Color;
+using System.Linq;
 
 namespace Wacom
 {
@@ -162,7 +163,7 @@ namespace Wacom
                 CachedFileManager.DeferUpdates(file);
 
                 // Write to file
-                await FileIO.WriteBytesAsync(file, Will3Codec.Encode(mRenderer.StrokeHandler.Serialize()));
+                await FileIO.WriteBytesAsync(file, UimCodec.Encode(mRenderer.StrokeHandler.Serialize()));
 
                 // Let Windows know that we're finished changing the file so the other app can update the remote version of the file.
                 // Completing updates may require Windows to ask for user input.
@@ -194,20 +195,23 @@ namespace Wacom
                 {
                     IBuffer fileBuffer = await FileIO.ReadBufferAsync(file);
 
-                    var inkDocument = Will3Codec.Decode(fileBuffer.ToArray());
+                    var inkDocument = UimCodec.Decode(fileBuffer.ToArray());
 
                     mRenderer.ClearStrokes();
 
-                    if (inkDocument.Brushes.RasterBrushes.Count > 0 && inkDocument.Brushes.VectorBrushes.Count > 0)
+                    int vectorBrushesCount = inkDocument.Brushes.VectorBrushes.Count();
+                    int rasterBrushesCount = inkDocument.Brushes.RasterBrushes.Count();
+
+                    if (rasterBrushesCount > 0 && vectorBrushesCount > 0)
                     {
                         throw new NotImplementedException("This sample does not support serialization of both raster and vector brushes");
                     }
-                    else if (inkDocument.Brushes.RasterBrushes.Count > 0)
+                    else if (rasterBrushesCount > 0)
                     {
                         CheckControlType(RasterBrushStyle.Pencil, btnPencil);
                         mRenderer.LoadInk(inkDocument);
                     }
-                    else if (inkDocument.Brushes.VectorBrushes.Count > 0)
+                    else if (vectorBrushesCount > 0)
                     {
                         CheckControlType(VectorBrushStyle.Pen, btnPen);
                         mRenderer.LoadInk(inkDocument);

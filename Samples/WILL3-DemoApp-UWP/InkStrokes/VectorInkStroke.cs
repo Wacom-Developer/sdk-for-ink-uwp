@@ -25,20 +25,18 @@ namespace Wacom
         public PointerDeviceType PointerDeviceType { get; set; }
         private VectorSplineInkBuilder mInkBuilder = new VectorSplineInkBuilder();
 
-        public VectorInkStroke(Stroke stroke, long zindex, Wacom.Ink.Geometry.VectorBrush vectorBrush, PipelineData pipelineData)
+        public VectorInkStroke(Stroke stroke, Wacom.Ink.Geometry.VectorBrush vectorBrush, PipelineData pipelineData)
         {
             Id = stroke.Id;
-            ZIndex = zindex;
-
             PathPointProperties ppp = stroke.Style.PathPointProperties;
             Color = MediaColor.FromArgb(
-                            ppp.Alpha.HasValue ? (byte)(ppp.Alpha * 255.0f) : byte.MinValue,
-                            ppp.Red.HasValue ? (byte)(ppp.Red * 255.0f) : byte.MinValue,
-                            ppp.Green.HasValue ? (byte)(ppp.Green * 255.0f) : byte.MinValue,
-                            ppp.Blue.HasValue ? (byte)(ppp.Blue * 255.0f) : byte.MinValue);
+                (byte)(ppp.Alpha * 255.0f),
+                (byte)(ppp.Red * 255.0f),
+                (byte)(ppp.Green * 255.0f),
+                (byte)(ppp.Blue * 255.0f));
 
-            Spline = stroke.Spline;
-            Layout = stroke.Layout;
+            Spline = stroke.Spline.ToSpline();
+           // Layout = stroke.Layout;
             VectorBrush = vectorBrush;
             Polygon = PolygonUtil.ConvertPolygon(pipelineData.Merged.Addition);
             SimplPoly = pipelineData.Merged.Addition;
@@ -47,11 +45,7 @@ namespace Wacom
             SensorDataId = stroke.SensorDataId;
 
             Attributes attribs = new Attributes(Color);
-
-            if (ppp.Size.HasValue)
-            {
-                attribs.Size = ppp.Size.Value;
-            }
+            attribs.Size = ppp.Size;
 
             Constants = attribs;
         }
@@ -67,8 +61,8 @@ namespace Wacom
             SensorDataId = sensorDataId;
 
             // Cloning is needed, otherwise the spatial data is corrupted
-            Spline = inkBuilder.SplineProducer.AllData.Clone();
-            Layout = inkBuilder.Layout;
+            Spline = inkBuilder.SplineAccumulator.Accumulated.Clone();
+            //Layout = inkBuilder.Layout;
             VectorBrush = vectorBrush;
             SimplPoly = mergedPolygons;
 
@@ -78,11 +72,9 @@ namespace Wacom
         public VectorInkStroke(Spline newSpline, IInkStroke originalStroke, int firstPointIndex, int pointsCount)
         {
             Id = Identifier.FromNewGuid();
-            ZIndex = ((VectorInkStroke)originalStroke).ZIndex;
             
             // Cloning is needed, otherwise the spatial data is corrupted
             Spline = newSpline;
-            Layout = originalStroke.Layout;
             VectorBrush = originalStroke.VectorBrush;
             SensorDataOffset = originalStroke.SensorDataOffset + (uint)firstPointIndex; // add the original stroke sensor data offset as a stroke can be split multiple times
             SensorDataId = ((VectorInkStroke)originalStroke).SensorDataId;
@@ -111,7 +103,7 @@ namespace Wacom
 
         public void UpdateSpline(Spline newSpline)
         {
-            var result = mInkBuilder.AddWholePath(newSpline, Layout, VectorBrush);
+            var result = mInkBuilder.AddWholePath(newSpline, VectorBrush);
 
             Spline = newSpline;
             SimplPoly = result.Merged.Addition;
@@ -126,7 +118,7 @@ namespace Wacom
 
         public Spline Spline { get; set; }
 
-        public PathPointLayout Layout { get; set; }
+        //public PathPointLayout Layout { get; set; }
 
         public Wacom.Ink.Geometry.VectorBrush VectorBrush { get; set; }
 

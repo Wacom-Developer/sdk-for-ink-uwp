@@ -36,8 +36,8 @@ namespace Wacom
         private uint mStartRandomSeed;
         private Random mRand = new Random();
         private DrawStrokeResult mDrawStrokeResult;
-        private ParticleList mAddedInterpolatedSpline;
-        private ParticleList mPredictedInterpolatedSpline;
+        private ParticleList mAddedInterpolatedSpline = new ParticleList();
+        private ParticleList mPredictedInterpolatedSpline = new ParticleList();
         private RasterBrushStyle mBrushStyle;
         private StrokeConstants mStrokeConstants = new StrokeConstants();
 
@@ -56,7 +56,7 @@ namespace Wacom
             set { mStrokeConstants.Color = value; }
         }
 
-        public override InkBuilder InkBuilder => RasterInkBuilder;
+        //public RasterInkBuilder InkBuilder => RasterInkBuilder;
 
         #endregion
 
@@ -80,7 +80,6 @@ namespace Wacom
         }
 
         #endregion
-
 
         #region Public Interface
 
@@ -106,7 +105,7 @@ namespace Wacom
 
         public override void SetupStrokeTool(Windows.Devices.Input.PointerDevice device)
         {
-            PathPointLayout layout = mActiveTool.GetLayout(device.PointerDeviceType);
+            LayoutMask layout = mActiveTool.GetLayout(device.PointerDeviceType);
             Calculator calculator = mActiveTool.GetCalculator(device.PointerDeviceType);
 
             RasterInkBuilder.UpdatePipeline(layout, calculator, mActiveTool.ParticleSpacing);
@@ -130,7 +129,7 @@ namespace Wacom
         /// </summary>
         /// <param name="renderingContext">RenderingContext to draw to</param>
         /// <param name="o">Cached stroke (as object)</param>
-        public override void DoRenderStroke(RenderingContext renderingContext, object o)
+        public override void DoRenderStroke(RenderingContext renderingContext, object o, bool translationLayerPainted)
         {
             RasterInkStroke stroke = (RasterInkStroke)o;
             renderingContext.DrawParticleStroke(stroke.Path, stroke.StrokeConstants, stroke.ParticleBrush, Ink.Rendering.BlendMode.SourceOver, stroke.RandomSeed);
@@ -151,29 +150,20 @@ namespace Wacom
         /// <remarks>Copies the output of the render pipeline from InkBuilder to dry strokes</remarks>
         public override void StoreCurrentStroke(PointerDeviceType deviceType)
         {
-            var allData = RasterInkBuilder.SplineInterpolator.AllData;
-            var points = new List<float>();
+            var allData = RasterInkBuilder.GetFullInterpolatedPath();
 
-            if (allData != null)
+
+            if ((allData != null) && (allData.Count > 0))
             {
-                for (int i = 0; i < allData.Count; i++)
-                {
-                    points.Add(allData[i]);
-                }
-
-                if (points.Count > 0)
-                {
-
-                    var dryStroke = new RasterInkStroke(RasterInkBuilder,
-                        deviceType,
-                        points,
-                        mStartRandomSeed,
-                        CreateSerializationBrush($"will://examples/brushes/{Guid.NewGuid().ToString()}"),
-                        mActiveTool.Brush,
-                        mStrokeConstants.Clone(),
-                        mSerializer.AddSensorData(deviceType, InkBuilder.GetPointerDataList()));
-                    mDryStrokes.Add(dryStroke);
-                }
+                var dryStroke = new RasterInkStroke(RasterInkBuilder,
+                    deviceType,
+                    allData,
+                    mStartRandomSeed,
+                    CreateSerializationBrush($"will://examples/brushes/{Guid.NewGuid().ToString()}"),
+                    mActiveTool.Brush,
+                    mStrokeConstants.Clone(),
+                    mSerializer.AddSensorData(deviceType, RasterInkBuilder.GetPointerDataList()));
+                mDryStrokes.Add(dryStroke);
             }
         }
 
@@ -195,7 +185,7 @@ namespace Wacom
                 context.SetTarget(mRenderer.CurrentStrokeLayer);
                 context.ClearColor(Colors.Transparent);
 
-                DoRenderStroke(context, stroke);
+                DoRenderStroke(context, stroke, mRenderer.TranslationLayerPainted);
 
                 // Blend stroke to Scene Layer
                 context.SetTarget(mRenderer.SceneLayer);
@@ -215,10 +205,8 @@ namespace Wacom
         {
             var result = mActiveTool.Path;
 
-            uint channelMask = (uint)RasterInkBuilder.SplineInterpolator.InterpolatedSplineLayout.ChannelMask;
-
-            mAddedInterpolatedSpline.Assign(result.Addition, channelMask);
-            mPredictedInterpolatedSpline.Assign(result.Prediction, channelMask);
+            mAddedInterpolatedSpline.Assign(result.Addition, (uint)result.Addition.LayoutMask);
+            mPredictedInterpolatedSpline.Assign(result.Prediction, (uint)result.Prediction.LayoutMask);
 
             // Draw the added stroke
             mRenderer.RenderingContext.SetTarget(mRenderer.CurrentStrokeLayer);
@@ -290,7 +278,7 @@ namespace Wacom
                     throw new Exception("Unknown brush type");
             }
             mActiveTool.PointsAdded += OnPointsAdded;
-            RasterInkBuilder.LayoutUpdated += InkBuilder_LayoutUpdated;
+            //RasterInkBuilder.LayoutUpdated += InkBuilder_LayoutUpdated;
         }
 
         public void OnPointsAdded(object sender, EventArgs args)
@@ -307,18 +295,16 @@ namespace Wacom
         public Wacom.Ink.Serialization.Model.RasterBrush CreateSerializationBrush(string name)
         {
             return new Wacom.Ink.Serialization.Model.RasterBrush(name,
-                                            (float)mActiveTool.Brush.FillTileSize.Width, 
+                                            (float)mActiveTool.Brush.FillTileSize.Width,
                                             (float)mActiveTool.Brush.FillTileSize.Height,
                                             true,
                                             (RotationMode)mActiveTool.Brush.RotationMode,
                                             mActiveTool.Brush.Scattering,
-                                            ((DistanceBasedInterpolator)mActiveTool.InkBuilder.SplineInterpolator).Spacing,
+                                            mActiveTool.InkBuilder.SplineInterpolator.Spacing,
                                             mActiveTool.Fill.ImageFileData,
                                             new List<byte[]>() { mActiveTool.Shape.ImageFileData },
-                                            new List<string>(),
-                                            string.Empty,
                                             Wacom.Ink.Serialization.Model.BlendMode.SourceOver
-                                           );
+                                            );
         }
 
         private List<RasterInkStroke> RecreateDryStrokes(InkModel inkDataModel)
@@ -371,14 +357,10 @@ namespace Wacom
 
         private RasterInkStroke CreateDryStrokeFromRasterBrush(DecodedRasterInkBuilder decodedRasterInkBuilder, RasterBrush rasterBrush, Stroke stroke)
         {
-            var result = decodedRasterInkBuilder.AddWholePath(stroke.Spline.Data, rasterBrush.Spacing, stroke.Layout);
-
-            List<float> points = new List<float>(result.Addition);
-
-            uint channelMask = (uint)decodedRasterInkBuilder.SplineInterpolator.InterpolatedSplineLayout.ChannelMask;
+            var result = decodedRasterInkBuilder.AddWholePath(stroke.Spline.ToSpline(), rasterBrush.Spacing);
 
             ParticleList particleList = new ParticleList();
-            particleList.Assign(points, channelMask);
+            particleList.Assign(result.Addition, (uint)result.Addition.LayoutMask);
 
             ParticleBrush particleBrush = new ParticleBrush
             {
@@ -408,20 +390,19 @@ namespace Wacom
 
             #endregion
 
-            public ProcessorResult<List<float>> AddWholePath(List<float> path, float spacing, PathPointLayout layout)
+            public ProcessorResult<Path> AddWholePath(Spline spline, float spacing)
             {
-                if (path.Count == 0)
+                if (spline.Path.Count == 0)
                     throw new Exception("Path has no points!");
 
-                SplineInterpolator = new DistanceBasedInterpolator(layout, spacing, splitCount, true, true);
+                SplineInterpolator = new DistanceBasedInterpolator(spacing, splitCount, true, true);
 
-                var iterpolatedPoints = SplineInterpolator.Add(true, true, new Spline(layout.ChannelMask, path), new Spline(layout.ChannelMask));
+                var iterpolatedPoints = SplineInterpolator.Add(true, true, spline, null);
 
                 return iterpolatedPoints;
             }
         }
 
         #endregion
-
     }
 }

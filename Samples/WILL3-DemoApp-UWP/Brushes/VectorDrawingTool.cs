@@ -26,7 +26,7 @@ namespace Wacom
             new BrushPolygon(6.0f, VectorBrushFactory.CreateEllipseBrush(16, 1.0f, 1.0f)),
             new BrushPolygon(18.0f, VectorBrushFactory.CreateEllipseBrush(32, 1.0f, 1.0f)));
 
-        public VectorInkBuilder InkBuilder { get; } = new VectorInkBuilder();
+        public VectorInkBuilder InkBuilder { get; } = new VectorInkBuilder(true);
 
         public abstract VectorBrush Shape { get; }
 
@@ -35,20 +35,20 @@ namespace Wacom
         public override void OnPressed(UIElement uiElement, PointerRoutedEventArgs args)
         {
             InkBuilder.AddPointsFromEvent(Phase.Begin, uiElement, args);
-            Polygons = InkBuilder.GetPolygons();
+            Polygons = InkBuilder.GetCurrentPolygons();
             PointsAdded?.Invoke(this, null);
         }
 
         public override void OnMoved(UIElement uiElement, PointerRoutedEventArgs args)
         {
             InkBuilder.AddPointsFromEvent(Phase.Update, uiElement, args);
-            Polygons = InkBuilder.GetPolygons();
+            Polygons = InkBuilder.GetCurrentPolygons();
             PointsAdded?.Invoke(this, null);
         }
         public override void OnReleased(UIElement uiElement, PointerRoutedEventArgs args)
         {
             InkBuilder.AddPointsFromEvent(Phase.End, uiElement, args);
-            Polygons = InkBuilder.GetPolygons();
+            Polygons = InkBuilder.GetCurrentPolygons();
             DrawingFinished?.Invoke(this, BlendCurrentStroke);
         }
 
@@ -100,19 +100,20 @@ namespace Wacom
 
         protected override float PreviousSize { get; set; } = 1.5f;
 
-        public override PathPointLayout GetLayout(Windows.Devices.Input.PointerDeviceType deviceType)
+        public override LayoutMask GetLayout(Windows.Devices.Input.PointerDeviceType deviceType)
         {
             switch (deviceType)
             {
                 case Windows.Devices.Input.PointerDeviceType.Mouse:
                 case Windows.Devices.Input.PointerDeviceType.Touch:
-                    return new PathPointLayout(PathPoint.Property.X,
-                                            PathPoint.Property.Y,
-                                            PathPoint.Property.Size);
+                    return  LayoutMask.X |
+                            LayoutMask.Y |
+                            LayoutMask.Size;
+
                 case Windows.Devices.Input.PointerDeviceType.Pen:
-                    return new PathPointLayout(PathPoint.Property.X,
-                                            PathPoint.Property.Y,
-                                            PathPoint.Property.Size);
+                    return  LayoutMask.X |
+                            LayoutMask.Y |
+                            LayoutMask.Size;
                 default:
                     throw new Exception("Unknown input device type");
             }
@@ -192,22 +193,24 @@ namespace Wacom
 
         protected override float PreviousSize { get; set; } = 2f;
 
-        public override PathPointLayout GetLayout(Windows.Devices.Input.PointerDeviceType deviceType)
+        public override LayoutMask GetLayout(Windows.Devices.Input.PointerDeviceType deviceType)
         {
             switch (deviceType)
             {
                 case Windows.Devices.Input.PointerDeviceType.Mouse:
                 case Windows.Devices.Input.PointerDeviceType.Touch:
-                    return new PathPointLayout(PathPoint.Property.X,
-                                            PathPoint.Property.Y,
-                                            PathPoint.Property.Size);
+                    return  LayoutMask.X |
+                            LayoutMask.Y |
+                            LayoutMask.Size;
+
                 case Windows.Devices.Input.PointerDeviceType.Pen:
-                    return new PathPointLayout(PathPoint.Property.X,
-                                            PathPoint.Property.Y,
-                                            PathPoint.Property.Size,
-                                            PathPoint.Property.Rotation,
-                                            PathPoint.Property.ScaleX,
-                                            PathPoint.Property.OffsetX);
+                    return  LayoutMask.X |
+                            LayoutMask.Y |
+                            LayoutMask.Size |
+                            LayoutMask.Rotation |
+                            LayoutMask.ScaleX |
+                            LayoutMask.OffsetX;
+
                 default:
                     throw new Exception("Unknown input device type");
             }
@@ -298,22 +301,23 @@ namespace Wacom
         protected override float PreviousSize { get; set; } = 10;
 
 
-        public override PathPointLayout GetLayout(Windows.Devices.Input.PointerDeviceType deviceType)
+        public override LayoutMask GetLayout(Windows.Devices.Input.PointerDeviceType deviceType)
         {
             switch (deviceType)
             {
                 case Windows.Devices.Input.PointerDeviceType.Mouse:
                 case Windows.Devices.Input.PointerDeviceType.Touch:
-                    return new PathPointLayout(PathPoint.Property.X,
-                                            PathPoint.Property.Y,
-                                            PathPoint.Property.Size);
+                    return  LayoutMask.X |
+                            LayoutMask.Y |
+                            LayoutMask.Size;
+
                 case Windows.Devices.Input.PointerDeviceType.Pen:
-                    return new PathPointLayout(PathPoint.Property.X,
-                                            PathPoint.Property.Y,
-                                            PathPoint.Property.Size,
-                                            PathPoint.Property.Rotation,
-                                            PathPoint.Property.ScaleX,
-                                            PathPoint.Property.OffsetX);
+                    return  LayoutMask.X |
+                            LayoutMask.Y |
+                            LayoutMask.Size |
+                            LayoutMask.Rotation |
+                            LayoutMask.ScaleX |
+                            LayoutMask.OffsetX;
                 default:
                     throw new Exception("Unknown input device type");
             }
@@ -437,34 +441,16 @@ namespace Wacom
         public override void OnPressed(UIElement uiElement, PointerRoutedEventArgs args)
         {
             var currentPt = args.GetCurrentPoint(uiElement).Position;
-            var ptInDest = DestRect.Contains(currentPt);
-
-            // If there is currently a selection, but this new point is outside of it,
-            // complete previous translation before starting a new selection
-            if (mIsTranslating && !ptInDest)
-            {
-                TranslateFinished?.Invoke(this, Translation);
-            }
-
-            // If there is currently a selection and this new point is inside of it,
-            // we are recommencing previous translation
-            bool continueTranslation = mIsTranslating && ptInDest;
-
-            // If point is in destination rect, we are (re)starting a translation
-            mIsTranslating = ptInDest;
+            mIsTranslating = CurrentPointIntersectsSourceRect(currentPt);
 
             if (mIsTranslating)
             {
-                if (!continueTranslation)
-                { 
-                    mStartPosition = currentPt;
-                    mPrevPosition = mStartPosition;
-                }
+                mStartPosition = currentPt;
+                mPrevPosition = mStartPosition;
                 OnTranslate?.Invoke(this, null);
             }
             else
             {
-                // No translating, initiate stroke drawing to make selection
                 base.OnPressed(uiElement, args);
             }
         }
@@ -495,62 +481,62 @@ namespace Wacom
         {
             if (mIsTranslating)
             {
-                Translation = GetTranslation(args.GetCurrentPoint(uiElement).Position);
-                //SourceRect = DestRect;
-                //TranslateFinished?.Invoke(this, translation);
+                Matrix3x2 translation = Matrix3x2.Identity;
+
+                var pt = args.GetCurrentPoint(uiElement).Position;
+                if (!mStrokeHandler.TransformationMatrix.IsIdentity)
+                {
+                    bool res = Matrix3x2.Invert(mStrokeHandler.TransformationMatrix, out Matrix3x2 modelTransformationMatrix);
+
+                    if (!res)
+                    {
+                        throw new InvalidOperationException("Transform matrix could not be inverted.");
+                    }
+
+                    Vector2 currentPointPos = new Vector2((float)pt.X, (float)pt.Y);
+                    Vector2 startPos = new Vector2((float)mStartPosition.X, (float)mStartPosition.Y);
+                    Vector2 modelCurrentPointPos = Vector2.Transform(currentPointPos, modelTransformationMatrix);
+                    Vector2 modelStartPos = Vector2.Transform(startPos, modelTransformationMatrix);
+
+                    double dX = modelCurrentPointPos.X - modelStartPos.X;
+                    double dY = modelCurrentPointPos.Y - modelStartPos.Y;
+                    translation = Matrix3x2.CreateTranslation((float)dX, (float)dY);
+                }
+                else
+                {
+                    double dX = pt.X - mStartPosition.X;
+                    double dY = pt.Y - mStartPosition.Y;
+                    translation = Matrix3x2.CreateTranslation((float)dX, (float)dY);
+                }
+
+                TranslateFinished?.Invoke(this, translation);
             }
             else
             {
                 base.OnReleased(uiElement, args);
             }
 
-            //mIsTranslating = false;
+            mIsTranslating = false;
         }
 
-        public Matrix3x2 Translation { get; private set; }
-
-        private Matrix3x2 GetTranslation(Point pt)
+        private bool CurrentPointIntersectsSourceRect(Point currentPoint)
         {
-            Matrix3x2 translation;
-            
-            if (!mStrokeHandler.TransformationMatrix.IsIdentity)
-            {
-                bool res = Matrix3x2.Invert(mStrokeHandler.TransformationMatrix, out Matrix3x2 modelTransformationMatrix);
+            if (SourceRect.IsEmpty)
+                return false;
 
-                if (!res)
-                {
-                    throw new InvalidOperationException("Transform matrix could not be inverted.");
-                }
-
-                Vector2 currentPointPos = new Vector2((float)pt.X, (float)pt.Y);
-                Vector2 startPos = new Vector2((float)mStartPosition.X, (float)mStartPosition.Y);
-                Vector2 modelCurrentPointPos = Vector2.Transform(currentPointPos, modelTransformationMatrix);
-                Vector2 modelStartPos = Vector2.Transform(startPos, modelTransformationMatrix);
-
-                double dX = modelCurrentPointPos.X - modelStartPos.X;
-                double dY = modelCurrentPointPos.Y - modelStartPos.Y;
-                translation = Matrix3x2.CreateTranslation((float)dX, (float)dY);
-            }
-            else
-            {
-                double dX = pt.X - mStartPosition.X;
-                double dY = pt.Y - mStartPosition.Y;
-                translation = Matrix3x2.CreateTranslation((float)dX, (float)dY);
-            }
-
-            return translation;
+            return SourceRect.Contains(currentPoint);
         }
 
-        public override PathPointLayout GetLayout(Windows.Devices.Input.PointerDeviceType deviceType)
+        public override LayoutMask GetLayout(Windows.Devices.Input.PointerDeviceType deviceType)
         {
             switch (deviceType)
             {
                 case Windows.Devices.Input.PointerDeviceType.Mouse:
                 case Windows.Devices.Input.PointerDeviceType.Touch:
                 case Windows.Devices.Input.PointerDeviceType.Pen:
-                    return new PathPointLayout(PathPoint.Property.X,
-                                            PathPoint.Property.Y,
-                                            PathPoint.Property.Size);
+                    return  LayoutMask.X |
+                            LayoutMask.Y |
+                            LayoutMask.Size;
                 default:
                     throw new Exception("Unknown input device type");
             }
@@ -607,16 +593,16 @@ namespace Wacom
         }
 
 
-        public override PathPointLayout GetLayout(Windows.Devices.Input.PointerDeviceType deviceType)
+        public override LayoutMask GetLayout(Windows.Devices.Input.PointerDeviceType deviceType)
         {
             switch (deviceType)
             {
                 case Windows.Devices.Input.PointerDeviceType.Mouse:
                 case Windows.Devices.Input.PointerDeviceType.Touch:
                 case Windows.Devices.Input.PointerDeviceType.Pen:
-                    return new PathPointLayout(PathPoint.Property.X,
-                                            PathPoint.Property.Y,
-                                            PathPoint.Property.Size);
+                    return  LayoutMask.X |
+                            LayoutMask.Y |
+                            LayoutMask.Size;
                 default:
                     throw new Exception("Unknown input device type");
             }
@@ -636,6 +622,4 @@ namespace Wacom
         }
 
     }
-
-
 }

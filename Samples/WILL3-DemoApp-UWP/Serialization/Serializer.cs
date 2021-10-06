@@ -25,7 +25,6 @@ namespace Wacom
 
         private Wacom.Ink.Serialization.Model.Environment mEnvironment = new Wacom.Ink.Serialization.Model.Environment();
         private Dictionary<Identifier, Wacom.Ink.Serialization.Model.Environment> mEnvironments = new Dictionary<Identifier, Wacom.Ink.Serialization.Model.Environment>();
-        private readonly SensorChannel mTimestampSensorChannel;
 
         private Dictionary<Identifier, SensorData> mSensorDataMap = new Dictionary<Identifier, SensorData>(); private Dictionary<PointerDeviceType, Identifier> mDeviceTypeMap = new Dictionary<PointerDeviceType, Identifier>();
         private Dictionary<Identifier, InkInputProvider> mInkInputProvidersMap = new Dictionary<Identifier, InkInputProvider>();
@@ -41,11 +40,6 @@ namespace Wacom
 
         public Serializer()
         {
-            mTimestampSensorChannel = new SensorChannel(
-                InkSensorType.Timestamp,
-                InkSensorMetricType.Time,
-                null, 0.0f, 0.0f, 0);
-
             InitInputConfig();
         }
 
@@ -137,9 +131,9 @@ namespace Wacom
             const uint precision = 2;
 
             List<SensorChannel> sensorChannels = new List<SensorChannel>();
-            sensorChannels.Add(new SensorChannel(InkSensorType.X, InkSensorMetricType.Length, null, 0.0f, 0.0f, precision));
-            sensorChannels.Add(new SensorChannel(InkSensorType.Y, InkSensorMetricType.Length, null, 0.0f, 0.0f, precision));
-            sensorChannels.Add(new SensorChannel(InkSensorType.Timestamp, InkSensorMetricType.Time, null, 0.0f, 0.0f, 0));
+            sensorChannels.Add(new SensorChannel(InkSensorType.X, InkSensorMetricType.Length, 0, 0, 0, precision));
+            sensorChannels.Add(new SensorChannel(InkSensorType.Y, InkSensorMetricType.Length, 0, 0, 0, precision));
+            sensorChannels.Add(new SensorChannel(InkSensorType.Timestamp, InkSensorMetricType.Time, 0, 0, 0, 0));
 
             SensorChannelsContext sensorChannelsContext = new SensorChannelsContext(
                 inkInputProvider,
@@ -164,7 +158,7 @@ namespace Wacom
             style.PathPointProperties.Alpha = stroke.Color.A / 255.0f;
 
             AddVectorBrushToInkDoc(stroke.PointerDeviceType.ToString(), vectorBrush, style);
-            EncodeStrokeCommon(stroke.Id, stroke.Spline.Clone(), stroke.Layout, stroke.SensorDataId, style);
+            EncodeStrokeCommon(stroke.Id, stroke.Spline.Clone(), stroke.SensorDataId, style);
         }
 
         public void EncodeStroke(RasterInkStroke stroke)
@@ -177,7 +171,7 @@ namespace Wacom
             style.PathPointProperties.Alpha = stroke.StrokeConstants.Color.A / 255.0f;
 
             AddRasterBrushToInkDoc(stroke.PointerDeviceType, rasterBrush, style, stroke.StrokeConstants, stroke.RandomSeed);
-            EncodeStrokeCommon(stroke.Id, stroke.Spline, stroke.Layout, stroke.SensorDataId, style);
+            EncodeStrokeCommon(stroke.Id, stroke.Spline, stroke.SensorDataId, style);
         }
 
         public Identifier AddSensorData(PointerDeviceType deviceType, List<PointerData> pointerDataList)
@@ -199,16 +193,15 @@ namespace Wacom
             return sensorData.Id;
         }
 
-        private void EncodeStrokeCommon(Identifier id, Spline spline , PathPointLayout layout, Identifier sensorDataId, Style style)
+        private void EncodeStrokeCommon(Identifier id, Spline spline, Identifier sensorDataId, Style style)
         {
             Stroke stroke = new Stroke(
                 id,
                 spline.Clone(),
                 style,
-                layout,
                 sensorDataId);
 
-            StrokeNode strokeNode = new StrokeNode(Identifier.FromNewGuid(), stroke);
+            StrokeNode strokeNode = new StrokeNode(stroke);
             InkDocument.InkTree.Root.Add(strokeNode);
 
             if (sensorDataId != Identifier.Empty)

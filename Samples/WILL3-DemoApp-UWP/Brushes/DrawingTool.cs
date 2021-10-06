@@ -59,7 +59,7 @@ namespace Wacom
         public abstract void OnMoved(UIElement uiElement, PointerRoutedEventArgs args);
         public abstract void OnReleased(UIElement uiElement, PointerRoutedEventArgs args);
 
-        public abstract PathPointLayout GetLayout(Windows.Devices.Input.PointerDeviceType deviceType);
+        public abstract LayoutMask GetLayout(Windows.Devices.Input.PointerDeviceType deviceType);
         public abstract Calculator GetCalculator(Windows.Devices.Input.PointerDeviceType deviceType);
 
         protected float? ComputeValueBasedOnPressure(PointerData pointerData, float minValue, float maxValue,

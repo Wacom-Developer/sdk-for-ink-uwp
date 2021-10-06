@@ -63,7 +63,7 @@ namespace Wacom
 
         //public abstract IEnumerable<object> AllStrokes { get; }
 
-        public abstract InkBuilder InkBuilder { get; }
+        //public abstract InkBuilder InkBuilder { get; }
 
         public Serializer Serializer { get => mSerializer; }
 
@@ -95,7 +95,7 @@ namespace Wacom
         /// </summary>
         /// <param name="renderingContext">RenderingContext to draw to</param>
         /// <param name="stroke">Cached stroke (as object)</param>
-        public abstract void DoRenderStroke(RenderingContext renderingContext, object stroke);
+        public abstract void DoRenderStroke(RenderingContext renderingContext, object stroke, bool translationLayerPainted);
 
         public virtual void DrawTranslation(RenderingContext renderingContext, Layer translationLayer)
         {
@@ -108,7 +108,7 @@ namespace Wacom
         /// <param name="updateRect">returns bounding rectangle of area requiring update</param>
         public abstract void DoRenderNewStrokeSegment(out Rect updateRect);
 
-        public virtual void DoRenderSelectedStrokes(RenderingContext renderingCtx, IEnumerable<Identifier> selectedStrokeIds)
+        public virtual Rect DoRenderSelectedStrokes(RenderingContext renderingCtx, IEnumerable<Identifier> selectedStrokeIds)
         {
             throw new NotImplementedException();
         }

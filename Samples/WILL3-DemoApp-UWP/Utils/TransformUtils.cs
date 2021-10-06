@@ -10,24 +10,26 @@ namespace Wacom
 {
 	public class TransformUtils
 	{
-		public static Spline TransformSplineXY(Spline spline, PathPointLayout layout, Matrix3x2 matrix3x2)
+		public static Spline TransformSplineXY(Spline spline, Matrix3x2 matrix3x2)
 		{
             var transformedSpline = spline.Clone();
 
-			int xIndex = layout.IndexOf(PathPoint.Property.X);
-			int yIndex = layout.IndexOf(PathPoint.Property.Y);
+			LayoutMask layout = spline.LayoutMask;
+			int stride = layout.GetChannelsCount();
+			int xIndex = layout.GetChannelIndex(PathPoint.Property.X);
+			int yIndex = layout.GetChannelIndex(PathPoint.Property.Y);
 
-			for (int i = 0; i < transformedSpline.Data.Count; i+=layout.Count)
+			for (int i = 0; i < transformedSpline.Path.Count; i += stride)
 			{
 				int xCurIndex = xIndex + i;
 				int yCurIndex = yIndex + i;
 
-				Vector2 position = new Vector2(transformedSpline.Data[xCurIndex], transformedSpline.Data[yCurIndex]);
+				Vector2 position = new Vector2(transformedSpline.Path[xCurIndex], transformedSpline.Path[yCurIndex]);
 
 				Vector2 transformed = Vector2.Transform(position, matrix3x2);
 
-				transformedSpline.Data[xCurIndex] = transformed.X;
-				transformedSpline.Data[yCurIndex] = transformed.Y;
+				transformedSpline.Path[xCurIndex] = transformed.X;
+				transformedSpline.Path[yCurIndex] = transformed.Y;
 			}
             return transformedSpline;
 		}

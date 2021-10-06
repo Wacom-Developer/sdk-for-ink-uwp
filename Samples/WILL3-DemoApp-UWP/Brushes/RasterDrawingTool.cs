@@ -44,30 +44,30 @@ namespace Wacom
         /// </summary>
         public PixelInfo Shape { get; protected set; }
 
-        public ProcessorResult<List<float>> Path { get; private set; }
+        public ProcessorResult<Wacom.Ink.Geometry.Path> Path { get; private set; }
 
-        public RasterInkBuilder InkBuilder { get; } = new RasterInkBuilder();
+        public RasterInkBuilder InkBuilder { get; } = new RasterInkBuilder(true);
 
         protected abstract float PreviousAlpha { get; set; }
 
         public override void OnPressed(UIElement uiElement, PointerRoutedEventArgs args)
         {
             InkBuilder.AddPointsFromEvent(Phase.Begin, uiElement, args);
-            Path = InkBuilder.GetPath();
+            Path = InkBuilder.GetCurrentInterpolatedPaths();
             PointsAdded?.Invoke(this, null);
         }
 
         public override void OnMoved(UIElement uiElement, PointerRoutedEventArgs args)
         {
             InkBuilder.AddPointsFromEvent(Phase.Update, uiElement, args);
-            Path = InkBuilder.GetPath();
+            Path = InkBuilder.GetCurrentInterpolatedPaths();
             PointsAdded?.Invoke(this, null);
         }
 
         public override void OnReleased(UIElement uiElement, PointerRoutedEventArgs args)
         {
             InkBuilder.AddPointsFromEvent(Phase.End, uiElement, args);
-            Path = InkBuilder.GetPath();
+            Path = InkBuilder.GetCurrentInterpolatedPaths();
             DrawingFinished?.Invoke(this, BlendCurrentStroke);
         }
 
@@ -213,24 +213,25 @@ namespace Wacom
         protected override float PreviousSize { get; set; } = 6;
         protected override float PreviousAlpha { get; set; } = 0.2f;
 
-        public override PathPointLayout GetLayout(Windows.Devices.Input.PointerDeviceType deviceType)
+        public override LayoutMask GetLayout(Windows.Devices.Input.PointerDeviceType deviceType)
         {
             switch (deviceType)
             {
                 case Windows.Devices.Input.PointerDeviceType.Mouse:
                 case Windows.Devices.Input.PointerDeviceType.Touch:
-                    return new PathPointLayout(PathPoint.Property.X,
-                                                PathPoint.Property.Y,
-                                                PathPoint.Property.Size,
-                                                PathPoint.Property.Alpha);
+                    return  LayoutMask.X |
+                            LayoutMask.Y |
+                            LayoutMask.Size |
+                            LayoutMask.Alpha;
+
                 case Windows.Devices.Input.PointerDeviceType.Pen:
-                    return new PathPointLayout(PathPoint.Property.X,
-                                                PathPoint.Property.Y,
-                                                PathPoint.Property.Size,
-                                                PathPoint.Property.Alpha,
-                                                PathPoint.Property.Rotation,
-                                                PathPoint.Property.OffsetX,
-                                                PathPoint.Property.OffsetY);
+                    return  LayoutMask.X |
+                            LayoutMask.Y |
+                            LayoutMask.Size |
+                            LayoutMask.Alpha |
+                            LayoutMask.Rotation |
+                            LayoutMask.OffsetX |
+                            LayoutMask.OffsetY;
                 default:
                     throw new Exception("Unknown input device type");
             }
@@ -342,24 +343,26 @@ namespace Wacom
         protected override float PreviousSize { get; set; } = 28;
         protected override float PreviousAlpha { get; set; } = 0.02f;
 
-        public override PathPointLayout GetLayout(Windows.Devices.Input.PointerDeviceType deviceType)
+        public override LayoutMask GetLayout(Windows.Devices.Input.PointerDeviceType deviceType)
         {
             switch (deviceType)
             {
                 case Windows.Devices.Input.PointerDeviceType.Mouse:
                 case Windows.Devices.Input.PointerDeviceType.Touch:
-                    return new PathPointLayout(PathPoint.Property.X,
-                                                    PathPoint.Property.Y,
-                                                    PathPoint.Property.Size,
-                                                    PathPoint.Property.Alpha);
+                    return  LayoutMask.X |
+                            LayoutMask.Y |
+                            LayoutMask.Size |
+                            LayoutMask.Alpha;
+
                 case Windows.Devices.Input.PointerDeviceType.Pen:
-                    return new PathPointLayout(PathPoint.Property.X,
-                                                    PathPoint.Property.Y,
-                                                    PathPoint.Property.Size,
-                                                    PathPoint.Property.Rotation,
-                                                    PathPoint.Property.OffsetX,
-                                                    PathPoint.Property.OffsetY,
-                                                    PathPoint.Property.Alpha);
+                    return  LayoutMask.X |
+                            LayoutMask.Y |
+                            LayoutMask.Size |
+                            LayoutMask.Rotation |
+                            LayoutMask.OffsetX |
+                            LayoutMask.OffsetY |
+                            LayoutMask.Alpha;
+
                 default:
                     throw new Exception("Unknown input device type");
             }
@@ -471,24 +474,26 @@ namespace Wacom
         protected override float PreviousSize { get; set; } = MinSize;
         protected override float PreviousAlpha { get; set; } = 0.1f;
 
-        public override PathPointLayout GetLayout(Windows.Devices.Input.PointerDeviceType deviceType)
+        public override LayoutMask GetLayout(Windows.Devices.Input.PointerDeviceType deviceType)
         {
             switch (deviceType)
             {
                 case Windows.Devices.Input.PointerDeviceType.Mouse:
                 case Windows.Devices.Input.PointerDeviceType.Touch:
-                    return new PathPointLayout(PathPoint.Property.X,
-                                                    PathPoint.Property.Y,
-                                                    PathPoint.Property.Size,
-                                                    PathPoint.Property.Alpha);
+                    return  LayoutMask.X |
+                            LayoutMask.Y |
+                            LayoutMask.Size |
+                            LayoutMask.Alpha;
+
                 case Windows.Devices.Input.PointerDeviceType.Pen:
-                    return new PathPointLayout(PathPoint.Property.X,
-                                                    PathPoint.Property.Y,
-                                                    PathPoint.Property.Size,
-                                                    PathPoint.Property.Alpha,
-                                                    PathPoint.Property.Rotation,
-                                                    PathPoint.Property.OffsetX,
-                                                    PathPoint.Property.OffsetY);
+                    return LayoutMask.X |
+                           LayoutMask.Y |
+                           LayoutMask.Size |
+                           LayoutMask.Alpha |
+                           LayoutMask.Rotation |
+                           LayoutMask.OffsetX |
+                           LayoutMask.OffsetY;
+
                 default:
                     throw new Exception("Unknown input device type");
             }
