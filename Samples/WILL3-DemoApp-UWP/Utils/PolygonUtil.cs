@@ -1,36 +1,34 @@
-﻿using Wacom.Ink.Geometry;
-using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Numerics;
 using Wacom.Ink.Rendering;
 
-
-namespace Wacom
+namespace WacomInkDemoUWP
 {
-	using DIPolygon = List<Vector2>;
-	public static class PolygonUtil
-	{
-		static public Polygon ConvertPolygon(List<DIPolygon> src)
-		{
-			Polygon dest = new Polygon();
+    using DIPolygon = List<Vector2>;
 
-			foreach (var polygon in src)
-			{
-				dest.AddContour(polygon);
-			}
+    public static class PolygonUtil
+    {
+        public static Polygon ConvertPolygon(List<DIPolygon> src)
+        {
+            Polygon dest = new Polygon();
 
-			return dest;
-		}
+            foreach (var polygon in src)
+            {
+                dest.AddContour(polygon);
+            }
 
-		static public void ConvertPolygon(List<DIPolygon> src, Polygon dest)
-		{
-			dest.RemoveAllContours();
+            return dest;
+        }
 
-			foreach (var polygon in src)
-			{
-				dest.AddContour(polygon);
-			}
-		}
+        public static void ConvertPolygon(List<DIPolygon> src, Polygon dest)
+        {
+            dest.RemoveAllContours();
 
-	}
+            foreach (var polygon in src)
+            {
+                dest.AddContour(polygon);
+            }
+        }
+
+    }
 }
