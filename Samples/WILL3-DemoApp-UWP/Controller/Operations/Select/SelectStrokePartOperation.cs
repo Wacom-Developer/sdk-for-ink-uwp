@@ -57,16 +57,6 @@ namespace WacomInkDemoUWP
 
         public void ProcessSelectorResult(SelectStrokePartResult result)
         {
-            List<Color> newColor = new List<Color>()
-            {
-                Colors.LightBlue,
-                Colors.PaleGreen,
-                Colors.Pink,
-                Colors.Yellow,
-                Colors.Turquoise
-            };
-            int newColorIdx = 0;
-
             // Translation (moving) raster strokes is not supported so only select vector strokes
             foreach (var fragments in result.Fragments.Where(f => f.Key is VectorStroke))
             {
@@ -78,8 +68,8 @@ namespace WacomInkDemoUWP
 
                 foreach (var fragInfo in fragments.Value)
                 {
-                    // Overlapped fragments represent the points where the selection stroke crossed over an ink stroke
-                    // To disregard/discard those fragments, rather than include them, uncomment the following line
+                    // Overlapped fragments represent the areas where the selection stroke crossed over an ink stroke
+                    // To discard those fragments, rather than include them, uncomment the following line
                     //if (!fragInfo.IsOverlapped)
                     {
                         SplineFragment frag = fragInfo.Fragment;
@@ -87,7 +77,7 @@ namespace WacomInkDemoUWP
                         Stroke addedStroke = new VectorStroke(
                             Identifier.FromNewGuid(),
                             newSpline,
-                            newColor[newColorIdx],//stroke.Color,
+                            stroke.Color,
                             stroke.Brush,
                             stroke.Size,
                             stroke.Rotation,
@@ -106,8 +96,6 @@ namespace WacomInkDemoUWP
                         {
                             m_controller.ModelSelectStroke(addedStroke.Id);
                         }
-
-                        newColorIdx = (newColorIdx + 1) % newColor.Count;
                     }
                 }
             }
