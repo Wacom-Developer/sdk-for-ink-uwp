@@ -41,7 +41,7 @@ namespace WacomInkDemoUWP
 
         #region Properties
 
-        public bool UseNewInterpolator { get; set; }
+        public bool UseNewInterpolator { get; } = true;
         public DrawVectorStrokeOperation DrawVectorStrokeOp { get; }
         public DrawRasterStrokeOperation DrawRasterStrokeOp { get; }
         public EraseStrokePartOperation EraseStrokePartOp { get; }
@@ -110,6 +110,7 @@ namespace WacomInkDemoUWP
         public void Clear()
         {
             m_model.ClearState();
+            ClearSelection();
 
             m_view.InvalidateSceneAndOverlay();
             m_view.TryRedrawAllStrokes(m_model.Strokes);//.Where(stroke => !m_model.SelectedStrokes.Contains(stroke.Id)));
@@ -377,25 +378,22 @@ namespace WacomInkDemoUWP
 
         private void DetermineCurrentOperation(PointerEventArgs args)
         {
+            Debug.WriteLine($"DetermineCurrentOperation opMode={m_operationMode}  currentOp is {m_currentOperation.GetType().Name}");
+
             if (m_currentOperation != EmptyOp)
             {
                 return;
             }
 
-            Debug.WriteLine($"DetermineCurrentOperation opMode={m_operationMode}  currentOp is {m_currentOperation.GetType().Name}");
-
             if (args.CurrentPoint.Properties.IsLeftButtonPressed)
             {
-                bool selectionCleared = false;
+                bool clearSelection = m_model.SelectedStrokes.Any();
 
-                if (m_model.SelectedStrokes.Any() &&
-                    !MoveSelectedStrokesOp.BoundingRect.Contains(args.CurrentPoint.Position))
+                if (clearSelection &&
+                    MoveSelectedStrokesOp.BoundingRect.Contains(args.CurrentPoint.Position))
                 {
-                    // Click outside selection rect - clear current selection 
-                    m_model.SelectedStrokes.Clear();
-                    MoveSelectedStrokesOp.BoundingRect = Rect.Empty;
-                    selectionCleared = true;
-                    m_view.InvalidateSceneAndOverlay();
+                    // Click inside selection rect 
+                    clearSelection = false;
                 }
 
                 if (m_operationMode == OperationMode.VectorDrawing)
@@ -416,21 +414,28 @@ namespace WacomInkDemoUWP
                 }
                 else if (m_operationMode == OperationMode.MoveSelected)
                 {
-                    if (selectionCleared)
+                    if (clearSelection)
                     {
                         SetOperationMode(MoveSelectedStrokesOp.SelectionMode);
                         m_currentOperation = MoveSelectedStrokesOp.SelectionMode == OperationMode.SelectStrokePart ? SelectStrokePartOp : (UserOperation)SelectWholeStrokeOp;
                     }
                     else
                     {
-                        //  current op remains MoveSelected
+                        // Restore current op to MoveSelected
+                        m_currentOperation = MoveSelectedStrokesOp;
                     }
                 }
                 else if (m_operationMode == OperationMode.SelectStrokePart)
                 {
                     if (!SwitchToMoveMode(args.CurrentPoint.Position))
                     {
+                        Debug.WriteLine($"  Op => SelectStrokePartOp (no switch to move)");
                         m_currentOperation = SelectStrokePartOp;
+                    }
+                    else
+                    {
+                        // Restore current op to MoveSelected
+                        m_currentOperation = MoveSelectedStrokesOp;
                     }
                 }
                 else if (m_operationMode == OperationMode.SelectStrokeWhole)
@@ -439,8 +444,24 @@ namespace WacomInkDemoUWP
                     {
                         m_currentOperation = SelectWholeStrokeOp;
                     }
+                    else
+                    {
+                        // Restore current op to SelectStrokeWhole
+                        m_currentOperation = MoveSelectedStrokesOp;
+                    }
+                }
+                if (clearSelection)
+                {
+                    ClearSelection();
+                    m_view.InvalidateSceneAndOverlay();
                 }
             }
+        }
+
+        private void ClearSelection()
+        {
+            m_model.SelectedStrokes.Clear();
+            MoveSelectedStrokesOp.BoundingRect = Rect.Empty;
         }
 
         private bool SwitchToMoveMode(Point currentPosition)
@@ -448,9 +469,9 @@ namespace WacomInkDemoUWP
             if (MoveSelectedStrokesOp.BoundingRect.Contains(currentPosition))
             {
                 // Click inside selection rect - switch to move mode
+                MoveSelectedStrokesOp.SelectionMode = m_operationMode;
                 SetOperationMode(OperationMode.MoveSelected);
                 m_currentOperation = MoveSelectedStrokesOp;
-                MoveSelectedStrokesOp.SelectionMode = m_operationMode;
                 return true;
             }
             return false;

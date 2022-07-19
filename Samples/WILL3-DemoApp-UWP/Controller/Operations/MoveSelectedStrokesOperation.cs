@@ -3,7 +3,6 @@ using System.Numerics;
 using Windows.Foundation;
 using Windows.UI.Core;
 
-
 namespace WacomInkDemoUWP
 {
     public class MoveSelectedStrokesOperation : UserOperation
@@ -13,7 +12,7 @@ namespace WacomInkDemoUWP
 
         public Rect BoundingRect { get; set; } = Rect.Empty;
         public OperationMode SelectionMode { get; set; }
-
+                                                                                
         public MoveSelectedStrokesOperation(InkPanelController controller)
             : base(controller)
         {
@@ -35,7 +34,11 @@ namespace WacomInkDemoUWP
 
         public override void OnPointerReleased(PointerEventArgs args)
         {
-            m_controller.ModelMoveSelectedStrokes(Matrix3x2.CreateTranslation(OffsetFromOrigin(args.CurrentPoint.Position)));
+            var offset = OffsetFromOrigin(args.CurrentPoint.Position);
+
+            BoundingRect = new Rect(BoundingRect.X + offset.X, BoundingRect.Y + offset.Y, BoundingRect.Width, BoundingRect.Height);
+
+            m_controller.ModelMoveSelectedStrokes(Matrix3x2.CreateTranslation(offset));
         }
 
         public override void UpdateView(InkPanelModel model, InkPanelView view)

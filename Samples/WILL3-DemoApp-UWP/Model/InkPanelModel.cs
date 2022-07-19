@@ -278,7 +278,7 @@ namespace WacomInkDemoUWP
 
                     m_spatialModel.Remove(stroke);
                     Stroke.TransformPath(vectorStroke.Spline.Path, transform, 1f);
-                    stroke.RebuildCache(false);
+                    stroke.RebuildCache(true);
                     m_spatialModel.TryAdd(vectorStroke);
                 }
             }

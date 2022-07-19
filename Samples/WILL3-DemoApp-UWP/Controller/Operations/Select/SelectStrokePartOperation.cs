@@ -1,7 +1,10 @@
 ﻿using System.Linq;
+using System.Collections.Generic;
+
 using Wacom.Ink;
 using Wacom.Ink.Geometry;
 using Wacom.Ink.Manipulations;
+using Windows.UI;
 using Windows.UI.Core;
 
 namespace WacomInkDemoUWP
@@ -54,6 +57,16 @@ namespace WacomInkDemoUWP
 
         public void ProcessSelectorResult(SelectStrokePartResult result)
         {
+            List<Color> newColor = new List<Color>()
+            {
+                Colors.LightBlue,
+                Colors.PaleGreen,
+                Colors.Pink,
+                Colors.Yellow,
+                Colors.Turquoise
+            };
+            int newColorIdx = 0;
+
             // Translation (moving) raster strokes is not supported so only select vector strokes
             foreach (var fragments in result.Fragments.Where(f => f.Key is VectorStroke))
             {
@@ -66,15 +79,15 @@ namespace WacomInkDemoUWP
                 foreach (var fragInfo in fragments.Value)
                 {
                     // Overlapped fragments represent the points where the selection stroke crossed over an ink stroke
-                    // In this sample we disregard/discard those fragments
-                    if (!fragInfo.IsOverlapped)
+                    // To disregard/discard those fragments, rather than include them, uncomment the following line
+                    //if (!fragInfo.IsOverlapped)
                     {
                         SplineFragment frag = fragInfo.Fragment;
                         Spline newSpline = new Spline(stroke.Spline.Path.GetPart(frag.BeginPointIndex, frag.PointsCount), frag.Ts, frag.Tf);
                         Stroke addedStroke = new VectorStroke(
                             Identifier.FromNewGuid(),
                             newSpline,
-                            stroke.Color,
+                            newColor[newColorIdx],//stroke.Color,
                             stroke.Brush,
                             stroke.Size,
                             stroke.Rotation,
@@ -89,10 +102,12 @@ namespace WacomInkDemoUWP
 
                         m_controller.ModelStoreStroke(addedStroke, indexOfSplitStroke++);
                         addedStroke.RebuildCache(true);
-                        if (fragInfo.IsInsideSelection)
+                        if (fragInfo.IsInsideSelection || fragInfo.IsOverlapped)
                         {
                             m_controller.ModelSelectStroke(addedStroke.Id);
                         }
+
+                        newColorIdx = (newColorIdx + 1) % newColor.Count;
                     }
                 }
             }
