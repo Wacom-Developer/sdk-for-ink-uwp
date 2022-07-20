@@ -393,7 +393,18 @@ namespace WacomInkDemoUWP
                     MoveSelectedStrokesOp.BoundingRect.Contains(args.CurrentPoint.Position))
                 {
                     // Click inside selection rect 
-                    clearSelection = false;
+                    switch (m_operationMode)
+                    {
+                        case OperationMode.SelectStrokePart:
+                        case OperationMode.SelectStrokeWhole:
+                        case OperationMode.MoveSelected:
+                            clearSelection = false;
+                            break;
+
+                        default:
+                            // One of the drawing or erasing modes. Leave clearSelection == true;
+                            break;
+                    }
                 }
 
                 if (m_operationMode == OperationMode.VectorDrawing)

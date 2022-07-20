@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" IgnorableNamespaces="uap mp">
-  <Identity Name="05f5f56d-fab8-42c3-8502-b24dbc6ebbca" Publisher="CN=&quot;Wacom Co., Ltd.&quot;, O=&quot;Wacom Co., Ltd.&quot;, S=Saitama, C=JP" Version="2.0.2.0" />
+  <Identity Name="05f5f56d-fab8-42c3-8502-b24dbc6ebbca" Publisher="CN=&quot;Wacom Co., Ltd.&quot;, O=&quot;Wacom Co., Ltd.&quot;, S=Saitama, C=JP" Version="2.0.4.0" />
   <mp:PhoneIdentity PhoneProductId="05f5f56d-fab8-42c3-8502-b24dbc6ebbca" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
   <Properties>
     <DisplayName>WILL3-DemoApp</DisplayName>
