@@ -35,29 +35,32 @@ The SDK contains the NuGet packages required by the application code.
 
 Build the application in Visual Studio 2019.
 
-- open the demo application WILL3-DemoApp-UWP.sln solution file
-- if prompted, select Developer Mode in Visual Studio
-- to compile the application you will need to add the NuGet packages to the project. One way is as follows:
-    - copy the sdk folder containing NuGet packages to a local folder
+- Open the demo application WILL3-DemoApp-UWP.sln solution file
+- If prompted, select Developer Mode in Visual Studio
+- To compile the application you will need to add the NuGet packages to the project. One way is as follows:
+    - Copy the sdk folder containing NuGet packages to a local folder
       e.g. *WILL NuGets* 
-    - right-click the project in Solution Explorer
+    - Right-click the project in Solution Explorer
     - Select *Manage NuGet Packages...* 
       Wacom packages may be listed as unavailable. To resolve:
     - Select Settings (gear wheel) - displays the Options dialog
     - Select New (+)
-    - this will set new source Name: to 'Package Source' by default.
+    - This will set new source Name: to 'Package Source' by default.
       Change to *Wacom*
-    - click the browse button ...
-    - navigate to the *WILL NuGets* folder
-    - click Update
-    - on return to NuGet Package Manager change Package Source: to the newly created source folder (e.g. *Wacom*)
+    - Click the browse button ...
+    - Navigate to the *WILL NuGets* folder
+    - Click Update
+    - On return to NuGet Package Manager change Package Source: to the newly created source folder (e.g. *Wacom*)
       Wacom packages should now be shown as available (if necessary select Install):
         Wacom.Ink
         Wacom.Ink.Rendering.UWP
-
-- build the project as Debug x86 or Debug x64
-- run the program to display the main window
-- by selecting different options in the menu, the rendering options can be explored.
+- Generate a certificate: 
+    - Right-click the solution and go to Properties. Select Application and press the Package Manifest... button. 
+    - From there, select the Packaging tab and Choose Certificate...
+    - Create a certificate and press OK. 
+- Build the project as Debug x86 or Debug x64
+- Run the program to display the main window
+- By selecting different options in the menu, the rendering options can be explored.
 - Options are included to clear the display and to save, or read a WILL Universal ink file
 
 
@@ -69,9 +72,3 @@ Build the application in Visual Studio 2019.
 Having installed the NuGet packages the API can be viewed through IntelliSense or Object Browser in Visual Studio.
 
 ----
-
-        
-
-
-
-
