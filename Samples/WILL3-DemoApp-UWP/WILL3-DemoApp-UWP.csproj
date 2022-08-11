@@ -23,8 +23,8 @@
     <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
     <AppxAutoIncrementPackageRevision>True</AppxAutoIncrementPackageRevision>
     <AppxBundle>Always</AppxBundle>
-    <AppxBundlePlatforms>x86|x64|arm</AppxBundlePlatforms>
-    <AppInstallerUpdateFrequency>1</AppInstallerUpdateFrequency>
+    <AppxBundlePlatforms>x64</AppxBundlePlatforms>
+    <AppInstallerUpdateFrequency>0</AppInstallerUpdateFrequency>
     <AppInstallerCheckForUpdateFrequency>OnApplicationRun</AppInstallerCheckForUpdateFrequency>
     <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
     <GenerateTestArtifacts>True</GenerateTestArtifacts>
@@ -40,6 +40,7 @@
     <UseVSHostingProcess>false</UseVSHostingProcess>
     <ErrorReport>prompt</ErrorReport>
     <Prefer32Bit>true</Prefer32Bit>
+    <CodeAnalysisRuleSet>FindDeadCode.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
     <OutputPath>bin\x86\Release\</OutputPath>
@@ -106,35 +107,56 @@
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Brushes\BrushOptions.cs" />
-    <Compile Include="Brushes\DrawingTool.cs" />
-    <Compile Include="InkBuilders\PipelineData.cs" />
+    <Compile Include="Canvas\Model\Paint.cs" />
+    <Compile Include="Controller\InkPanelController.cs" />
+    <Compile Include="Controller\Operations\Draw\DrawRasterStrokeOperation.cs" />
+    <Compile Include="Controller\Operations\Draw\DrawStrokeOperation.cs" />
+    <Compile Include="Controller\Operations\Draw\DrawVectorStrokeOperation.cs" />
+    <Compile Include="Controller\Operations\Erase\EraseStrokeOperation.cs" />
+    <Compile Include="Controller\Operations\Erase\EraseStrokePartOperation.cs" />
+    <Compile Include="Controller\Operations\Erase\EraseWholeStrokeOperation.cs" />
+    <Compile Include="Controller\Operations\MoveSelectedStrokesOperation.cs" />
+    <Compile Include="Controller\Operations\Select\SelectStrokeOperation.cs" />
+    <Compile Include="Controller\Operations\Select\SelectStrokePartOperation.cs" />
+    <Compile Include="Controller\Operations\Select\SelectWholeStrokeOperation.cs" />
+    <Compile Include="Controller\Operations\UserOperation.cs" />
+    <Compile Include="InkBuilders\Layouts.cs" />
     <Compile Include="InkBuilders\PointerDataProviderExtensions.cs" />
-    <Compile Include="InkBuilders\RasterInkBuilder.cs" />
+    <Compile Include="InkBuilders\RasterInkBuilderUWP.cs" />
     <Compile Include="InkBuilders\SensorDataAccumulator.cs" />
-    <Compile Include="InkBuilders\VectorInkBuilder.cs" />
-    <Compile Include="InkBuilders\VectorSplineInkBuilder.cs" />
-    <Compile Include="InkStrokes\VectorInkStrokeFactory.cs" />
-    <Compile Include="InkStrokes\RasterInkStroke.cs" />
-    <Compile Include="InkStrokes\VectorInkStroke.cs" />
-    <Compile Include="Rendering\RasterStrokeHandler.cs" />
-    <Compile Include="Brushes\RasterDrawingTool.cs" />
-    <Compile Include="Rendering\StrokeHandler.cs" />
-    <Compile Include="Rendering\VectorStrokeHandler.cs" />
-    <Compile Include="Brushes\VectorDrawingTool.cs" />
+    <Compile Include="InkBuilders\VectorInkBuilderUWP.cs" />
+    <Compile Include="InkPanel.cs" />
+    <Compile Include="InkTools\Brushes.cs" />
+    <Compile Include="InkTools\DrawingTool.cs" />
+    <Compile Include="InkTools\EraserTools\CircleEraserTool.cs" />
+    <Compile Include="InkTools\MathFunctions.cs" />
+    <Compile Include="InkTools\PngDataProvider.cs" />
+    <Compile Include="InkTools\RasterDrawingTool.cs" />
+    <Compile Include="InkTools\RasterTools\CrayonTool.cs" />
+    <Compile Include="InkTools\RasterTools\PencilTool.cs" />
+    <Compile Include="InkTools\RasterTools\WaterBrushTool.cs" />
+    <Compile Include="InkTools\SelectionTools\CircleSelectionTool.cs" />
+    <Compile Include="InkTools\VectorBrushGeometries.cs" />
+    <Compile Include="InkTools\VectorDrawingTool.cs" />
+    <Compile Include="InkTools\VectorTools\BrushTool.cs" />
+    <Compile Include="InkTools\VectorTools\FeltTool.cs" />
+    <Compile Include="InkTools\VectorTools\FountainPenTool.cs" />
+    <Compile Include="InkTools\VectorTools\PenTool.cs" />
     <Compile Include="MainPage.xaml.cs">
       <DependentUpon>MainPage.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Model\InkPanelModel.cs" />
+    <Compile Include="Model\Stroke.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Serialization\Serializer.cs" />
-    <Compile Include="Serialization\ShapeUriResolver.cs" />
     <Compile Include="Utils\DirtyRectManager.cs" />
+    <Compile Include="Utils\GeometryFactory.cs" />
+    <Compile Include="Utils\MatrixUtils.cs" />
     <Compile Include="Utils\PointerManager.cs" />
     <Compile Include="Utils\PolygonUtil.cs" />
+    <Compile Include="Utils\Range.cs" />
     <Compile Include="Utils\TransformUtils.cs" />
     <Compile Include="Utils\Utils.cs" />
-    <Compile Include="Rendering\Renderer.cs" />
-    <Compile Include="Utils\VectorBrushFactory.cs" />
+    <Compile Include="View\InkPanelView.cs" />
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest">
@@ -144,7 +166,6 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Assets\btn_clear.png" />
-    <Content Include="Assets\btn_color.png" />
     <Content Include="Assets\btn_load.png" />
     <Content Include="Assets\btn_save.png" />
     <Content Include="Assets\btn_tools\btn_brush.png" />
@@ -158,16 +179,20 @@
     <Content Include="Assets\btn_tools\eraser_partial_stroke.png" />
     <Content Include="Assets\btn_tools\eraser_whole_stroke.png" />
     <Content Include="Assets\fill.png" />
-    <Content Include="Assets\shape.png" />
+    <Content Include="Assets\FromBP\brushpen_shape_0_128x128.png" />
+    <Content Include="Assets\FromBP\brushpen_shape_1_64x64.png" />
+    <Content Include="Assets\FromBP\brushpen_shape_2_32x32.png" />
+    <Content Include="Assets\FromBP\brushpen_shape_3_16x16.png" />
+    <Content Include="Assets\FromBP\brushpen_shape_4_8x8.png" />
+    <Content Include="Assets\FromBP\brushpen_shape_5_4x4.png" />
+    <Content Include="Assets\FromBP\brushpen_shape_6_2x2.png" />
+    <Content Include="Assets\FromBP\brushpen_shape_7_1x1.png" />
+    <Content Include="Assets\shape_32x32.png" />
     <Content Include="Assets\SplashScreen.scale-200.png" />
     <Content Include="Assets\Square150x150Logo.scale-200.png" />
     <Content Include="Assets\Square44x44Logo.scale-200.png" />
     <Content Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
     <Content Include="Assets\StoreLogo.png" />
-    <Content Include="Assets\textures\essential_fill_11.png" />
-    <Content Include="Assets\textures\essential_fill_14.png" />
-    <Content Include="Assets\textures\essential_fill_17.png" />
-    <Content Include="Assets\textures\essential_shape.png" />
     <Content Include="Assets\Wide310x150Logo.scale-200.png" />
     <Content Include="Properties\Default.rd.xml" />
   </ItemGroup>
@@ -185,13 +210,17 @@
     <PackageReference Include="Microsoft.NETCore.UniversalWindowsPlatform">
       <Version>6.2.10</Version>
     </PackageReference>
+    <PackageReference Include="Wacom.Ink">
+      <Version>5.0.0</Version>
+    </PackageReference>
     <PackageReference Include="Wacom.Ink.Rendering.UWP">
-      <Version>4.1.0</Version>
+      <Version>4.1.2</Version>
     </PackageReference>
     <PackageReference Include="Win2D.uwp">
       <Version>1.25.0</Version>
     </PackageReference>
   </ItemGroup>
+  <ItemGroup />
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
     <VisualStudioVersion>14.0</VisualStudioVersion>
   </PropertyGroup>

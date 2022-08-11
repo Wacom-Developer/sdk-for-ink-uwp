@@ -1,23 +1,22 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Text;
+using Wacom.Ink.Serialization;
+using Wacom.Ink.Serialization.Model;
 using Windows.Storage;
 using Windows.Storage.Pickers;
 using Windows.Storage.Provider;
-using Windows.Storage.Streams;
 using Windows.UI;
 using Windows.UI.Popups;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media;
-
-using Wacom.Ink.Serialization;
-
 // Alias to avoid ambiguity with Wacom.Ink.Serialization.Model.Color
 using MediaColor = Windows.UI.Color;
-using System.Linq;
 
-namespace Wacom
+namespace WacomInkDemoUWP
 {
     /// <summary>
     /// The main page 
@@ -25,20 +24,11 @@ namespace Wacom
     public sealed partial class MainPage : Page
     {
         #region Fields
+        public static readonly string PROTO_EXT = ".proto";
+        public static readonly string UIM_EXT = ".uim";
+        public static readonly string JSON_EXT = ".json";
 
-        private Renderer mRenderer;
-        private MediaColor mBrushColor;
-
-        public MediaColor BrushColor {
-            get => mBrushColor;
-            set
-            {
-                mBrushColor = value;
-                mRenderer.StrokeHandler.BrushColor = value;
-                BtnColorPicker.Color = value;
-                BtnColorIcon.Foreground = new SolidColorBrush(value);
-            }
-        }
+        private readonly InkPanel m_inkPanel = new InkPanel();
 
         #endregion
 
@@ -47,71 +37,236 @@ namespace Wacom
         public MainPage()
         {
             this.InitializeComponent();
+
+            Loaded += OnLoaded;
+            Unloaded += OnUnloaded;
         }
 
         #endregion
 
         #region Event Handlers
 
-        private void OnPageLoaded(object sender, RoutedEventArgs e)
+        private void OnLoaded(object sender, RoutedEventArgs e)
         {
-            mRenderer = new Renderer(swapChainPanel, VectorBrushStyle.Pen, BrushColor);
-            BrushColor = Colors.Blue;
+            m_inkPanel.Initialize(swapChainPanel);
+            SetInkColor(Colors.Blue);
             ToggleBrushButton(btnPen);
         }
 
-        private void OnPageUnloaded(object sender, RoutedEventArgs e)
+        private void OnUnloaded(object sender, RoutedEventArgs e)
         {
-            mRenderer.StopProcessingInput();
-            mRenderer.Dispose();
-            mRenderer = null;
+            m_inkPanel.Dispose();
         }
+
 
         #endregion
 
         private void OnPen_Click(object sender, RoutedEventArgs e)
         {
-            CheckControlType(VectorBrushStyle.Pen, (AppBarToggleButton)sender);
+            SetVectorTool((AppBarToggleButton)sender, "wdt:Pen");
         }
 
         private void OnFelt_Click(object sender, RoutedEventArgs e)
         {
-            CheckControlType(VectorBrushStyle.Felt, (AppBarToggleButton)sender);
+            SetVectorTool((AppBarToggleButton)sender, "wdt:Felt");
         }
 
         private void OnBrush_Click(object sender, RoutedEventArgs e)
         {
-            CheckControlType(VectorBrushStyle.Brush, (AppBarToggleButton)sender);
+            SetVectorTool((AppBarToggleButton)sender, "wdt:Brush");
         }
 
         private void OnPencil_Click(object sender, RoutedEventArgs e)
         {
-            CheckControlType(RasterBrushStyle.Pencil, (AppBarToggleButton)sender);
+            SetRasterTool((AppBarToggleButton)sender, "wdt:Pencil");
         }
 
         private void OnWaterBrush_Click(object sender, RoutedEventArgs e)
         {
-            CheckControlType(RasterBrushStyle.WaterBrush, (AppBarToggleButton)sender);
+            SetRasterTool((AppBarToggleButton)sender, "wdt:WaterBrush");
         }
 
         private void OnCrayon_Click(object sender, RoutedEventArgs e)
         {
-            CheckControlType(RasterBrushStyle.Crayon, (AppBarToggleButton)sender);
+            SetRasterTool((AppBarToggleButton)sender, "wdt:Crayon");
         }
 
-        private void CheckControlType(VectorBrushStyle brushStyle, AppBarToggleButton btn)
+        private void OnColorSet_Click(object sender, RoutedEventArgs e)
+        {
+            BtnColorFlyout.Hide();
+
+            SetInkColor(BtnColorPicker.Color);
+        }
+
+        private void OnClear_Click(object sender, RoutedEventArgs e)
+        {
+            m_inkPanel.Clear();
+
+        }
+
+        private async void OnSave_Click(object sender, RoutedEventArgs e)
+        {
+            int count = m_inkPanel.Model.Strokes.Count;
+
+            if (count == 0)
+            {
+                MessageDialog md = new MessageDialog("No strokes to save!", "Error saving file");
+                await md.ShowAsync();
+                return;
+            }
+
+            FileSavePicker savePicker = new FileSavePicker
+            {
+                SuggestedStartLocation = PickerLocationId.DocumentsLibrary
+            };
+            savePicker.FileTypeChoices.Add("Universal Ink Model", new List<string>() { UIM_EXT });
+            savePicker.FileTypeChoices.Add("Json Ink Model", new List<string>() { JSON_EXT });
+            savePicker.SuggestedFileName = "ink";
+
+            StorageFile file = await savePicker.PickSaveFileAsync();
+
+            if (file == null)
+            {
+                // Operation canceled by user.
+                return;
+            }
+
+            if (file.FileType != UIM_EXT &&
+                file.FileType != JSON_EXT)
+            {
+                MessageDialog md = new MessageDialog($"Unknown file type '{file.FileType}'!", "Error saving file");
+                await md.ShowAsync();
+                return;
+            }
+
+            InkModel inkModel = m_inkPanel.Model.BuildUniversalInkModelFromCanvasStrokes();
+            await m_inkPanel.Model.BuildUIMBrushesFromAppBrushes(inkModel);
+
+            // Prevent updates to the remote version of the file until we finish making changes and call CompleteUpdatesAsync.
+            CachedFileManager.DeferUpdates(file);
+
+            using (var stream = await file.OpenAsync(FileAccessMode.ReadWrite))
+            {
+                if (file.FileType == UIM_EXT)
+                {
+                    UimCodec.Encode(inkModel, stream.AsStream());
+                }
+                else if (file.FileType == JSON_EXT)
+                {
+                    IReadOnlyList<string> jsons = null;
+
+                    using (MemoryStream uimOutputStream = new MemoryStream())
+                    {
+                        UimCodec.Encode(inkModel, uimOutputStream);
+
+                        uimOutputStream.Seek(0, SeekOrigin.Begin);
+
+                        UimDecoder decoder = new UimDecoder();
+                        jsons = decoder.ConvertToJson(uimOutputStream);
+                    }
+
+                    if (jsons != null && jsons.Count > 0)
+                    {
+                        using (TextWriter tw = new StreamWriter(stream.AsStream(), Encoding.UTF8, 4096, true))
+                        {
+                            foreach (var json in jsons)
+                            {
+                                tw.Write(json);
+                            }
+                        }
+                    }
+                }
+
+                await stream.FlushAsync();
+            }
+
+            // Let Windows know that we're finished changing the file so the other app can update the remote version of the file.
+            // Completing updates may require Windows to ask for user input.
+            var status = await CachedFileManager.CompleteUpdatesAsync(file);
+
+            if (status != FileUpdateStatus.Complete)
+            {
+                MessageDialog md = new MessageDialog("File could not be saved!", "Error saving file");
+                await md.ShowAsync();
+            }
+        }
+
+        private async void OnLoad_Click(object sender, RoutedEventArgs e)
+        {
+            FileOpenPicker picker = new FileOpenPicker
+            {
+                ViewMode = PickerViewMode.Thumbnail,
+                SuggestedStartLocation = PickerLocationId.PicturesLibrary
+            };
+            picker.FileTypeFilter.Add(UIM_EXT);
+
+            StorageFile file = await picker.PickSingleFileAsync();
+
+            if ((file != null) && (file.FileType == UIM_EXT))
+            {
+                try
+                {
+                    using (var stream = await file.OpenReadAsync())
+                    {
+                        InkModel inkModel = UimCodec.Decode(stream.AsStream());
+
+                        await m_inkPanel.LoadStrokesFromModel(inkModel);
+                    }
+
+                    m_inkPanel.RebuildAndRepaintStrokesAndOverlay();
+                }
+                catch (Exception ex)
+                {
+                    MessageDialog md = new MessageDialog(ex.Message, "Error loading file.");
+                    await md.ShowAsync();
+                }
+            }
+        }
+
+        private void OnManipulatePart_Click(object sender, RoutedEventArgs e)
+        {
+            m_inkPanel.Controller.SetOperationMode(OperationMode.SelectStrokePart);
+            m_inkPanel.SetPartialStrokeSelectorTool("wdt:CircleSelector");
+            ToggleBrushButton((AppBarToggleButton)sender);
+        }
+
+        private void OnManipulateWhole_Click(object sender, RoutedEventArgs e)
+        {
+            m_inkPanel.Controller.SetOperationMode(OperationMode.SelectStrokeWhole);
+            m_inkPanel.SetWholeStrokeSelectorTool("wdt:CircleSelector");
+            ToggleBrushButton((AppBarToggleButton)sender);
+        }
+
+        private void OnErasePart_Click(object sender, RoutedEventArgs e)
+        {
+            m_inkPanel.Controller.SetOperationMode(OperationMode.EraseStrokePart);
+            m_inkPanel.SetPartialStrokeEraserTool("wdt:CircleEraser");
+            ToggleBrushButton((AppBarToggleButton)sender);
+        }
+
+        private void OnEraseWhole_Click(object sender, RoutedEventArgs e)
+        {
+            m_inkPanel.Controller.SetOperationMode(OperationMode.EraseWholeStroke);
+            m_inkPanel.SetWholeStrokeEraserTool("wdt:CircleEraser");
+            ToggleBrushButton((AppBarToggleButton)sender);
+        }
+
+        private void SetVectorTool(AppBarToggleButton btn, string toolName)
         {
             EnableManipulation(true);
-            mRenderer.SetHandler(brushStyle, BrushColor);
+            m_inkPanel.Controller.SetOperationMode(OperationMode.VectorDrawing);
+            m_inkPanel.SetVectorTool(toolName);
             ToggleBrushButton(btn);
         }
 
-        private void CheckControlType(RasterBrushStyle brushStyle, AppBarToggleButton btn)
+        private void SetRasterTool(AppBarToggleButton btn, string toolName)
         {
-            EnableManipulation(false);
-            mRenderer.SetHandler(brushStyle, BrushColor);
+            EnableManipulation(true);
+            m_inkPanel.Controller.SetOperationMode(OperationMode.RasterDrawing);
+            m_inkPanel.SetRasterTool(toolName);
             ToggleBrushButton(btn);
         }
+
 
         private void EnableManipulation(bool enable)
         {
@@ -122,7 +277,6 @@ namespace Wacom
         }
 
         private AppBarToggleButton mCurrentBrushBtn = null;
-        //private AppBarToggleButton mSavedButton = null;
 
         private void ToggleBrushButton(AppBarToggleButton btn)
         {
@@ -132,123 +286,11 @@ namespace Wacom
             mCurrentBrushBtn.IsChecked = true;
         }
 
-        private void OnColorSet_Click(object sender, RoutedEventArgs e)
+        private void SetInkColor(MediaColor color)
         {
-            BrushColor = BtnColorPicker.Color;
-            BtnColorIcon.Foreground = new SolidColorBrush(BrushColor);
-            BtnColorFlyout.Hide();
-        }
-
-        private void OnClear_Click(object sender, RoutedEventArgs e)
-        {
-            mRenderer.ClearStrokes();
-        }
-
-        private async void OnSave_Click(object sender, RoutedEventArgs e)
-        {
-            FileSavePicker savePicker = new FileSavePicker
-            {
-                SuggestedStartLocation = PickerLocationId.DocumentsLibrary
-            };
-
-            savePicker.FileTypeChoices.Add("WILL3 file", new List<string>() { ".uim" });
-            savePicker.SuggestedFileName = "InkModel";
-
-            StorageFile file = await savePicker.PickSaveFileAsync();
-
-            if (file != null)
-            {
-
-                // Prevent updates to the remote version of the file until we finish making changes and call CompleteUpdatesAsync.
-                CachedFileManager.DeferUpdates(file);
-
-                // Write to file
-                await FileIO.WriteBytesAsync(file, UimCodec.Encode(mRenderer.StrokeHandler.Serialize()));
-
-                // Let Windows know that we're finished changing the file so the other app can update the remote version of the file.
-                // Completing updates may require Windows to ask for user input.
-                FileUpdateStatus status = await CachedFileManager.CompleteUpdatesAsync(file);
-
-                if (status != FileUpdateStatus.Complete)
-                {
-                    MessageDialog md = new MessageDialog("File could not be saved!", "Error saving file");
-                    await md.ShowAsync();
-                }
-            }
-
-        }
-
-        private async void OnLoad_Click(object sender, RoutedEventArgs e)
-        {
-            FileOpenPicker picker = new FileOpenPicker
-            {
-                ViewMode = PickerViewMode.Thumbnail,
-                SuggestedStartLocation = PickerLocationId.DocumentsLibrary
-            };
-            picker.FileTypeFilter.Add(".uim");
-
-            StorageFile file = await picker.PickSingleFileAsync();
-
-            if (file != null)
-            {
-                try
-                {
-                    IBuffer fileBuffer = await FileIO.ReadBufferAsync(file);
-
-                    var inkDocument = UimCodec.Decode(fileBuffer.ToArray());
-
-                    mRenderer.ClearStrokes();
-
-                    int vectorBrushesCount = inkDocument.Brushes.VectorBrushes.Count();
-                    int rasterBrushesCount = inkDocument.Brushes.RasterBrushes.Count();
-
-                    if (rasterBrushesCount > 0 && vectorBrushesCount > 0)
-                    {
-                        throw new NotImplementedException("This sample does not support serialization of both raster and vector brushes");
-                    }
-                    else if (rasterBrushesCount > 0)
-                    {
-                        CheckControlType(RasterBrushStyle.Pencil, btnPencil);
-                        mRenderer.LoadInk(inkDocument);
-                    }
-                    else if (vectorBrushesCount > 0)
-                    {
-                        CheckControlType(VectorBrushStyle.Pen, btnPen);
-                        mRenderer.LoadInk(inkDocument);
-                    }
-
-                    mRenderer.RedrawAllStrokes(null, null);
-                }
-                catch (Exception ex)
-                {
-                    MessageDialog md = new MessageDialog(ex.Message, "Error loading file");
-                    await md.ShowAsync();
-                }
-            }
-        }
-
-        private void OnManipulatePart_Click(object sender, RoutedEventArgs e)
-        {
-            mRenderer.StartSelectionMode(StrokeHandler.SelectionMode.Manipulate | StrokeHandler.SelectionMode.Part);
-            ToggleBrushButton((AppBarToggleButton)sender);
-        }
-
-        private void OnManipulateWhole_Click(object sender, RoutedEventArgs e)
-        {
-            mRenderer.StartSelectionMode(StrokeHandler.SelectionMode.Manipulate | StrokeHandler.SelectionMode.Whole);
-            ToggleBrushButton((AppBarToggleButton)sender);
-        }
-
-        private void OnErasePart_Click(object sender, RoutedEventArgs e)
-        {
-            mRenderer.StartSelectionMode(StrokeHandler.SelectionMode.Erase | StrokeHandler.SelectionMode.Part);
-            ToggleBrushButton((AppBarToggleButton)sender);
-        }
-
-        private void OnEraseWhole_Click(object sender, RoutedEventArgs e)
-        {
-            mRenderer.StartSelectionMode(StrokeHandler.SelectionMode.Erase | StrokeHandler.SelectionMode.Whole);
-            ToggleBrushButton((AppBarToggleButton)sender);
+            BtnColorIcon.Foreground = new SolidColorBrush(color);
+            m_inkPanel.Controller.DrawVectorStrokeOp.Color = color;
+            m_inkPanel.Controller.DrawRasterStrokeOp.Color = color;
         }
 
     }

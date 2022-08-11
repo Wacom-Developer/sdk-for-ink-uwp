@@ -1,50 +1,49 @@
 ﻿
-namespace Wacom
+namespace WacomInkDemoUWP
 {
-    /// <summary>
-    /// Keeps a record of which pointer device (pen, mouse etc) ink collection is currently associated with 
-    /// to avoid potential conflicts should 2 or more pointer devices be in use simultaneously
-    /// </summary>
-    public struct PointerManager
+    struct PointerManager
     {
         #region Fields
 
-        private uint? mPointerId;
+        private uint? m_pointerId;
 
         #endregion
 
+        #region PointerEventArgs
 
-        public bool OnPressed(Windows.UI.Xaml.Input.PointerRoutedEventArgs args)
+        public bool OnPressed(Windows.UI.Core.PointerEventArgs args)
         {
             // If currently there is an unfinished stroke - do not interrupt it
-            if (mPointerId.HasValue)
+            if (m_pointerId.HasValue)
             {
                 return false;
             }
 
-            mPointerId = args.Pointer.PointerId;
+            m_pointerId = args.CurrentPoint.PointerId;
 
             return true;
         }
 
-        public bool OnMoved(Windows.UI.Xaml.Input.PointerRoutedEventArgs args)
+        public bool OnMoved(Windows.UI.Core.PointerEventArgs args)
         {
             // Accept only the saved pointer, reject others
-            return mPointerId.HasValue && (args.Pointer.PointerId == mPointerId.Value);
+            return m_pointerId.HasValue && (args.CurrentPoint.PointerId == m_pointerId.Value);
         }
 
-        public bool OnReleased(Windows.UI.Xaml.Input.PointerRoutedEventArgs args)
+        public bool OnReleased(Windows.UI.Core.PointerEventArgs args)
         {
             // Reject events from other pointers
-            if (!mPointerId.HasValue || (args.Pointer.PointerId != mPointerId.Value))
+            if (!m_pointerId.HasValue || (args.CurrentPoint.PointerId != m_pointerId.Value))
             {
                 return false;
             }
 
-            mPointerId = null;
+            m_pointerId = null;
 
             return true;
         }
+
+        #endregion
 
     }
 }
