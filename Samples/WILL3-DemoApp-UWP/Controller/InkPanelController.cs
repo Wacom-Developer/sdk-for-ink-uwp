@@ -97,7 +97,7 @@ namespace WacomInkDemoUWP
             if (m_operationMode != mode)
             {
                 m_operationMode = mode;
-                m_view.TryRedrawAllStrokes(m_model.Strokes);
+                m_view.InvalidateSceneAndOverlay();
             }
         }
 
@@ -111,10 +111,10 @@ namespace WacomInkDemoUWP
         {
             m_model.ClearState();
             ClearSelection();
+            m_currentOperation = EmptyOp;
 
             m_view.InvalidateSceneAndOverlay();
-            m_view.TryRedrawAllStrokes(m_model.Strokes);//.Where(stroke => !m_model.SelectedStrokes.Contains(stroke.Id)));
-            //m_view.TryOverlayRedraw(m_model); // No selected strokes to draw
+            m_view.TryRedrawAllStrokes(m_model.Strokes);
             m_view.StopProcessingEvents();
         }
 
@@ -427,8 +427,7 @@ namespace WacomInkDemoUWP
                 {
                     if (clearSelection)
                     {
-                        SetOperationMode(MoveSelectedStrokesOp.SelectionMode);
-                        m_currentOperation = MoveSelectedStrokesOp.SelectionMode == OperationMode.SelectStrokePart ? SelectStrokePartOp : (UserOperation)SelectWholeStrokeOp;
+                        RevertToSelectionMode();
                     }
                     else
                     {
@@ -473,6 +472,10 @@ namespace WacomInkDemoUWP
         {
             m_model.SelectedStrokes.Clear();
             MoveSelectedStrokesOp.BoundingRect = Rect.Empty;
+            if (m_operationMode == OperationMode.MoveSelected)
+            {                
+                RevertToSelectionMode();
+            }
         }
 
         private bool SwitchToMoveMode(Point currentPosition)
@@ -481,12 +484,19 @@ namespace WacomInkDemoUWP
             {
                 // Click inside selection rect - switch to move mode
                 MoveSelectedStrokesOp.SelectionMode = m_operationMode;
-                SetOperationMode(OperationMode.MoveSelected);
+                m_operationMode = OperationMode.MoveSelected;
                 m_currentOperation = MoveSelectedStrokesOp;
                 return true;
             }
             return false;
         }
+
+        private void RevertToSelectionMode()
+        {
+            m_operationMode = MoveSelectedStrokesOp.SelectionMode;
+            m_currentOperation = MoveSelectedStrokesOp.SelectionMode == OperationMode.SelectStrokePart ? SelectStrokePartOp : (UserOperation)SelectWholeStrokeOp;
+        }
+
         #endregion
 
         private WorkItemHandler MainLoopWorkItem()

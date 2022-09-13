@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Diagnostics;
 using Wacom.Ink.Geometry;
 using Windows.UI.Core;
 
@@ -19,13 +20,13 @@ namespace WacomInkDemoUWP
         {
             VectorTools = new List<VectorDrawingTool>()
             {
-                new BrushTool(),
+                new PenTool(),
                 new FeltTool(),
-                new FountainPenTool(),
-                new PenTool()
+                new BrushTool(),
+                //new FountainPenTool(),
             };
 
-            Tool = VectorTools[2];
+            Tool = VectorTools[0];
         }
 
         protected DrawVectorStrokeOperation(InkPanelController controller, List<VectorDrawingTool> tools, int defaultToolIndex)

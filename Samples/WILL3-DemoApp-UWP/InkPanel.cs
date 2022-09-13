@@ -50,6 +50,8 @@ namespace WacomInkDemoUWP
 
         public async Task LoadStrokesFromModel(InkModel inkModel)
         {
+            Clear();    // Clear existing strokes, including any selection
+
             await Model.LoadStrokesFromModel(inkModel, View.Graphics);
 
             foreach (var stroke in Model.Strokes)

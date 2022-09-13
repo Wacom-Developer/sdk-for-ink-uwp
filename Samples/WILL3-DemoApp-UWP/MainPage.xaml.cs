@@ -50,7 +50,7 @@ namespace WacomInkDemoUWP
         {
             m_inkPanel.Initialize(swapChainPanel);
             SetInkColor(Colors.Blue);
-            ToggleBrushButton(btnPen);
+            SetVectorTool(btnPen, "wdt:Pen");
         }
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
