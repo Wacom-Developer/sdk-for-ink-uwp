@@ -66,36 +66,42 @@ namespace WacomInkDemoUWP
 
                 m_controller.ModelRemoveStroke(indexOfSplitStroke);
 
+                // The point at which a stroke is "cut" results in 3 fragments:
+                //   1) wholly outside the selection (fragInfo.IsInsideSelection == false)
+                //   2) wholly inside the selection (fragInfo.IsInsideSelection == true && fragInfo.IsOverlapped == false)
+                //   3) where the selection crossed the original stroke (fragInfo.IsInsideSelection == true && fragInfo.IsOverlapped == true)
+                // In this sample we keep all 3 fragments as new strokes, with the "overlapped" one included within the selection
+                // Depending on your requirements, you can:
+                //    Keep all 3 fragments(as in this sample)
+                //    Discard the overlapped fragment. 
+                //    Reattach the overlapped to fragment either the selected or the non-selected fragment, or even both.
+                //      (See SplineFragment.SpliceAdjacentFragments)
+
                 foreach (var fragInfo in fragments.Value)
                 {
-                    // Overlapped fragments represent the areas where the selection stroke crossed over an ink stroke
-                    // To discard those fragments, rather than include them, uncomment the following line
-                    //if (!fragInfo.IsOverlapped)
-                    {
-                        SplineFragment frag = fragInfo.Fragment;
-                        Spline newSpline = new Spline(stroke.Spline.Path.GetPart(frag.BeginPointIndex, frag.PointsCount), frag.Ts, frag.Tf);
-                        Stroke addedStroke = new VectorStroke(
-                            Identifier.FromNewGuid(),
-                            newSpline,
-                            stroke.Color,
-                            stroke.Brush,
-                            stroke.Size,
-                            stroke.Rotation,
-                            stroke.ScaleX,
-                            stroke.ScaleY,
-                            stroke.OffsetX,
-                            stroke.OffsetY,
-                            stroke.ViewToModelScale,
-                            stroke.BlendMode,
-                            0,
-                            stroke.Tag);
+                    SplineFragment frag = fragInfo.Fragment;
+                    Spline newSpline = new Spline(stroke.Spline.Path.GetPart(frag.BeginPointIndex, frag.PointsCount), frag.Ts, frag.Tf);
+                    Stroke addedStroke = new VectorStroke(
+                        Identifier.FromNewGuid(),
+                        newSpline,
+                        stroke.Color,
+                        stroke.Brush,
+                        stroke.Size,
+                        stroke.Rotation,
+                        stroke.ScaleX,
+                        stroke.ScaleY,
+                        stroke.OffsetX,
+                        stroke.OffsetY,
+                        stroke.ViewToModelScale,
+                        stroke.BlendMode,
+                        0,
+                        stroke.Tag);
 
-                        m_controller.ModelStoreStroke(addedStroke, indexOfSplitStroke++);
-                        addedStroke.RebuildCache(true);
-                        if (fragInfo.IsInsideSelection || fragInfo.IsOverlapped)
-                        {
-                            m_controller.ModelSelectStroke(addedStroke.Id);
-                        }
+                    m_controller.ModelStoreStroke(addedStroke, indexOfSplitStroke++);
+                    addedStroke.RebuildCache(true);
+                    if (fragInfo.IsInsideSelection || fragInfo.IsOverlapped)
+                    {
+                        m_controller.ModelSelectStroke(addedStroke.Id);
                     }
                 }
             }

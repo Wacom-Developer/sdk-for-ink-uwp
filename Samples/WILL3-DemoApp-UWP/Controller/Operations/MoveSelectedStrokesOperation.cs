@@ -34,11 +34,18 @@ namespace WacomInkDemoUWP
 
         public override void OnPointerReleased(PointerEventArgs args)
         {
-            var offset = OffsetFromOrigin(args.CurrentPoint.Position);
+            if (BoundingRect != Rect.Empty)
+            {
+                var offset = OffsetFromOrigin(args.CurrentPoint.Position);
 
-            BoundingRect = new Rect(BoundingRect.X + offset.X, BoundingRect.Y + offset.Y, BoundingRect.Width, BoundingRect.Height);
+                BoundingRect = new Rect(BoundingRect.X + offset.X, BoundingRect.Y + offset.Y, BoundingRect.Width, BoundingRect.Height);
 
-            m_controller.ModelMoveSelectedStrokes(Matrix3x2.CreateTranslation(offset));
+                m_controller.ModelMoveSelectedStrokes(Matrix3x2.CreateTranslation(offset));
+            }
+            else
+            {
+                System.Diagnostics.Debugger.Break();
+            }
         }
 
         public override void UpdateView(InkPanelModel model, InkPanelView view)
