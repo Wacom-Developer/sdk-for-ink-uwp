@@ -4,6 +4,9 @@
 
 ## History
 
+### 4.1.2  (Release Code: 3.1) 13 June 2022
+    * Improved and updated WILL Ink manipulations  
+
 ### 4.1.0  (Release Code: 3.1) 15 October 2021
     * Data encoding process improvements and introduction of compression 
 
