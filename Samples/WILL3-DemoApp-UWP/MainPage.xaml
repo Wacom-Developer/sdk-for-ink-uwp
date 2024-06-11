@@ -5,7 +5,6 @@
     xmlns:local="using:WacomInkDemoUWP"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:win2d="using:Microsoft.Graphics.Canvas.UI.Xaml"
     mc:Ignorable="d"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" 
     >
@@ -22,7 +21,7 @@
         <CommandBar Background="Transparent" 
                     DefaultLabelPosition="Bottom"
                     IsOpen="False"
-                    >
+					x:Name="appCommandBar">
             <AppBarButton Label="Load" Click="OnLoad_Click">
                 <AppBarButton.Icon>
                     <BitmapIcon UriSource="ms-appx:///Assets/btn_load.png"/>
@@ -73,12 +72,12 @@
 
             <AppBarSeparator/>
 
-            <AppBarToggleButton Label="Pen" Click="OnPen_Click" x:Name="btnPen">
+            <AppBarToggleButton Label="Ball Pen" Click="OnBallPen_Click" x:Name="btnBallPen">
                 <AppBarToggleButton.Icon>
                     <BitmapIcon UriSource="ms-appx:///Assets/btn_tools/btn_pen.png"/>
                 </AppBarToggleButton.Icon>
             </AppBarToggleButton>
-            <AppBarToggleButton Label="Felt" Click="OnFelt_Click" x:Name="btnFelt">
+            <AppBarToggleButton Label="Fountain Pen" Click="OnFountainPen_Click" x:Name="btnFountainPen">
                 <AppBarToggleButton.Icon>
                     <BitmapIcon UriSource="ms-appx:///Assets/btn_tools/btn_feather.png"/>
                 </AppBarToggleButton.Icon>
@@ -136,8 +135,19 @@
         </CommandBar>
     </Page.TopAppBar>
     <Grid>
-        <SwapChainPanel Name="swapChainPanel" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
-
-
-    </Grid>
+		<ProgressRing 
+			Name="progressRing"
+			HorizontalAlignment="Center"
+			VerticalAlignment="Center"
+			Width="50"
+			Height="50"
+			Foreground="BlueViolet"
+			IsActive="False"
+			Visibility="Collapsed"/>
+		<SwapChainPanel
+			Name="swapChainPanel"
+			VerticalAlignment="Stretch"
+			HorizontalAlignment="Stretch"
+			Visibility="Visible"/>
+	</Grid>
 </Page>

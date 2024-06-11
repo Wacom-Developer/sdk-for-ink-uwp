@@ -11,7 +11,7 @@
     <AssemblyName>WILL3-DemoApp-UWP</AssemblyName>
     <DefaultLanguage>en-US</DefaultLanguage>
     <TargetPlatformIdentifier>UAP</TargetPlatformIdentifier>
-    <TargetPlatformVersion Condition=" '$(TargetPlatformVersion)' == '' ">10.0.17134.0</TargetPlatformVersion>
+    <TargetPlatformVersion Condition=" '$(TargetPlatformVersion)' == '' ">10.0.17763.0</TargetPlatformVersion>
     <TargetPlatformMinVersion>10.0.16299.0</TargetPlatformMinVersion>
     <MinimumVisualStudioVersion>14</MinimumVisualStudioVersion>
     <FileAlignment>512</FileAlignment>
@@ -19,7 +19,7 @@
     <WindowsXamlEnableOverview>true</WindowsXamlEnableOverview>
     <PackageCertificateKeyFile>
     </PackageCertificateKeyFile>
-    <PackageCertificateThumbprint>131396BE2D729EF965716A993E5A06ABEA5F2903</PackageCertificateThumbprint>
+    <PackageCertificateThumbprint>1D77904D70D42DAD856B3FDF66FA98EDA014FF2A</PackageCertificateThumbprint>
     <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
     <AppxAutoIncrementPackageRevision>True</AppxAutoIncrementPackageRevision>
     <AppxBundle>Always</AppxBundle>
@@ -29,6 +29,7 @@
     <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
     <GenerateTestArtifacts>True</GenerateTestArtifacts>
     <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
+    <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
     <DebugSymbols>true</DebugSymbols>
@@ -107,7 +108,8 @@
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Canvas\Model\Paint.cs" />
+    <Compile Include="Controller\Selection.cs" />
+    <Compile Include="Model\AppBrush.cs" />
     <Compile Include="Controller\InkPanelController.cs" />
     <Compile Include="Controller\Operations\Draw\DrawRasterStrokeOperation.cs" />
     <Compile Include="Controller\Operations\Draw\DrawStrokeOperation.cs" />
@@ -120,10 +122,9 @@
     <Compile Include="Controller\Operations\Select\SelectStrokePartOperation.cs" />
     <Compile Include="Controller\Operations\Select\SelectWholeStrokeOperation.cs" />
     <Compile Include="Controller\Operations\UserOperation.cs" />
-    <Compile Include="InkBuilders\Layouts.cs" />
+    <Compile Include="InkTools\Layouts.cs" />
     <Compile Include="InkBuilders\PointerDataProviderExtensions.cs" />
     <Compile Include="InkBuilders\RasterInkBuilderUWP.cs" />
-    <Compile Include="InkBuilders\SensorDataAccumulator.cs" />
     <Compile Include="InkBuilders\VectorInkBuilderUWP.cs" />
     <Compile Include="InkPanel.cs" />
     <Compile Include="InkTools\Brushes.cs" />
@@ -139,23 +140,22 @@
     <Compile Include="InkTools\VectorBrushGeometries.cs" />
     <Compile Include="InkTools\VectorDrawingTool.cs" />
     <Compile Include="InkTools\VectorTools\BrushTool.cs" />
-    <Compile Include="InkTools\VectorTools\FeltTool.cs" />
     <Compile Include="InkTools\VectorTools\FountainPenTool.cs" />
-    <Compile Include="InkTools\VectorTools\PenTool.cs" />
+    <Compile Include="InkTools\VectorTools\BallPenTool.cs" />
     <Compile Include="MainPage.xaml.cs">
       <DependentUpon>MainPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="Model\InkPanelModel.cs" />
+    <Compile Include="Model\RasterStroke.cs" />
     <Compile Include="Model\Stroke.cs" />
+    <Compile Include="Model\VectorStroke.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Utils\DirtyRectManager.cs" />
     <Compile Include="Utils\GeometryFactory.cs" />
     <Compile Include="Utils\MatrixUtils.cs" />
     <Compile Include="Utils\PointerManager.cs" />
-    <Compile Include="Utils\PolygonUtil.cs" />
+    <Compile Include="Utils\ListOfPolygonsExtensions.cs" />
     <Compile Include="Utils\Range.cs" />
-    <Compile Include="Utils\TransformUtils.cs" />
-    <Compile Include="Utils\Utils.cs" />
     <Compile Include="View\InkPanelView.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -178,21 +178,16 @@
     <Content Include="Assets\btn_tools\btn_water_brush.png" />
     <Content Include="Assets\btn_tools\eraser_partial_stroke.png" />
     <Content Include="Assets\btn_tools\eraser_whole_stroke.png" />
+    <Content Include="Assets\crayon_shape.png" />
     <Content Include="Assets\fill.png" />
-    <Content Include="Assets\FromBP\brushpen_shape_0_128x128.png" />
-    <Content Include="Assets\FromBP\brushpen_shape_1_64x64.png" />
-    <Content Include="Assets\FromBP\brushpen_shape_2_32x32.png" />
-    <Content Include="Assets\FromBP\brushpen_shape_3_16x16.png" />
-    <Content Include="Assets\FromBP\brushpen_shape_4_8x8.png" />
-    <Content Include="Assets\FromBP\brushpen_shape_5_4x4.png" />
-    <Content Include="Assets\FromBP\brushpen_shape_6_2x2.png" />
-    <Content Include="Assets\FromBP\brushpen_shape_7_1x1.png" />
+    <Content Include="Assets\pencil_shape.png" />
     <Content Include="Assets\shape_32x32.png" />
     <Content Include="Assets\SplashScreen.scale-200.png" />
     <Content Include="Assets\Square150x150Logo.scale-200.png" />
     <Content Include="Assets\Square44x44Logo.scale-200.png" />
     <Content Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
     <Content Include="Assets\StoreLogo.png" />
+    <Content Include="Assets\WacomLicense.txt" />
     <Content Include="Assets\Wide310x150Logo.scale-200.png" />
     <Content Include="Properties\Default.rd.xml" />
   </ItemGroup>
@@ -211,7 +206,7 @@
       <Version>6.2.10</Version>
     </PackageReference>
     <PackageReference Include="Wacom.Ink">
-      <Version>5.1.0</Version>
+      <Version>5.3.5</Version>
     </PackageReference>
     <PackageReference Include="Wacom.Ink.Rendering.UWP">
       <Version>4.1.2</Version>

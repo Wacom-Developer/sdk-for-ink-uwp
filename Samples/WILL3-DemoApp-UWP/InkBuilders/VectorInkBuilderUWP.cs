@@ -4,21 +4,12 @@ using Windows.UI.Core;
 
 namespace WacomInkDemoUWP
 {
-    public class VectorInkBuilderUWP : StockVectorInkBuilder
+    class VectorInkBuilderUWP : StockVectorInkBuilder
     {
-        public bool UseIntermediatePoints { get; set; }
+        public bool UseIntermediatePoints { get; set; } = true;
 
-        public SensorDataAccumulator SensorDataAccumulator { get; set; }
-
-        public VectorInkBuilderUWP(bool storeSensorData = false)
+        public VectorInkBuilderUWP()
         {
-            UseIntermediatePoints = true;
-
-            if (storeSensorData)
-            {
-                SensorDataAccumulator = new SensorDataAccumulator();
-                SensorDataAccumulator.SetDataProvider(PointerDataProvider);
-            }
         }
 
         public void UpdateVectorInkPipeline(
@@ -45,12 +36,6 @@ namespace WacomInkDemoUWP
         public void AddPointsFromEvent(Phase phase, PointerEventArgs args)
         {
             PointerDataProvider.AddPointsFromEvent(phase, args, UseIntermediatePoints);
-
-            if (SensorDataAccumulator != null)
-            {
-                SensorDataAccumulator.Process();
-            }
         }
-
     }
 }

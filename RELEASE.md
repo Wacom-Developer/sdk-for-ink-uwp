@@ -4,8 +4,8 @@
 
 ## History
 
-### X.X.X  (Release Code: 3.1) 27 May 2024
-    * Improved and updated license component
+### 5.3.5  (Release Code: 3.1) 27 May 2024
+    * Improved and updated license component & controls
 
 ### 4.1.2  (Release Code: 3.1) 13 June 2022
     * Improved and updated WILL Ink manipulations  

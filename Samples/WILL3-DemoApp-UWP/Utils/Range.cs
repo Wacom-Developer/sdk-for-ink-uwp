@@ -2,7 +2,7 @@
 
 namespace WacomInkDemoUWP
 {
-    public struct Range
+    struct Range
     {
         public float min;
         public float max;

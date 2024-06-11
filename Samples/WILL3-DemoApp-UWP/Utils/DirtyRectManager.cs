@@ -2,7 +2,7 @@
 
 namespace WacomInkDemoUWP
 {
-    public class DirtyRectManager
+    class DirtyRectManager
     {
         private Rect m_prevPredictedStrokeRect;
 

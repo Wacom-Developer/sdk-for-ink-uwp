@@ -4,12 +4,9 @@ using Wacom.Ink.Rendering;
 
 namespace WacomInkDemoUWP
 {
-    class CircleEraserTool : VectorDrawingTool
+    class BallPenTool : VectorDrawingTool
     {
-        private const float sizeMin = 9f;
-        private const float sizeMultiplier = 30f;
-
-        public CircleEraserTool() : base("wdt:CircleEraser")
+        public BallPenTool() : base("wdt:BallPen")
         {
             Brush = Brushes.Circle;
         }
@@ -21,33 +18,35 @@ namespace WacomInkDemoUWP
                 case Windows.Devices.Input.PointerDeviceType.Mouse:
                 case Windows.Devices.Input.PointerDeviceType.Touch:
                     layoutMask = Layouts.XYS;
-                    return CalculatePathPointForTouchOrMouse;
+                    return MouseAndTouchInputCalculator;
 
                 case Windows.Devices.Input.PointerDeviceType.Pen:
                     layoutMask = Layouts.XYS;
-                    return CalculatePathPointForPen;
+                    return PenInputCalculator;
             }
 
             throw new Exception("Unknown input device type");
         }
 
-        public static PathPoint CalculatePathPointForTouchOrMouse(PointerData previous, PointerData current, PointerData next)
+        static PathPoint MouseAndTouchInputCalculator(PointerData previous, PointerData current, PointerData next)
         {
-            float normVelocity = current.ComputeValueBasedOnSpeed(previous, next, 0.0f, 1.0f) ?? 0.5f;
+            float normVelocity = current.ComputeValueBasedOnSpeed(previous, next, 1.0f, 2.0f) ?? 1.5f;
 
             PathPoint pp = new PathPoint(current.X, current.Y)
             {
-                Size = sizeMin + sizeMultiplier * normVelocity
+                Size = MathFunctions.MapTo(normVelocity, new Range(1.0f, 2.0f), new Range(0.4f, 1.0f), (v) => MathFunctions.Sigmoid1(v, 0.62f))
             };
 
             return pp;
         }
 
-        public static PathPoint CalculatePathPointForPen(PointerData previous, PointerData current, PointerData next)
+        static PathPoint PenInputCalculator(PointerData previous, PointerData current, PointerData next)
         {
+            float pressure = current.Force ?? 0.8f;
+
             PathPoint pp = new PathPoint(current.X, current.Y)
             {
-                Size = sizeMin + sizeMultiplier * current.Force.Value
+                Size = 1.0f + 1.5f * pressure,
             };
 
             return pp;

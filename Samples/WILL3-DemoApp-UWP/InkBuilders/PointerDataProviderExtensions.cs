@@ -9,7 +9,7 @@ using Windows.UI.Xaml.Input;
 
 namespace WacomInkDemoUWP
 {
-    public static class PointerDataProviderExtensions
+    static class PointerDataProviderExtensions
     {
         public static void AddPointsFromEvent(this PointerDataProvider accumulator, Phase phase, PointerEventArgs args, bool useIntermediatePoints = true)
         {

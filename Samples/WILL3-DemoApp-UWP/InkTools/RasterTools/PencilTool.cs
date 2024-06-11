@@ -8,7 +8,7 @@ namespace WacomInkDemoUWP
     {
         public PencilTool() : base("wdt:Pencil")
         {
-            Paint = new Paint(Brushes.Pencil, 1.0f, 1.0f, 0.0f, 0.0f, BlendMode.SourceOver);
+            Brush = Brushes.Pencil;
         }
 
         public override Calculator GetCalulator(Windows.Devices.Input.PointerDevice device, out LayoutMask layoutMask)
@@ -21,8 +21,8 @@ namespace WacomInkDemoUWP
                     return MouseAndTouchInputCalculator;
 
                 case Windows.Devices.Input.PointerDeviceType.Pen:
-                    layoutMask = Layouts.XYSRCaSxOx;
-                    return PenInputCalculator;
+					layoutMask = Layouts.XYSCaSyOy;
+					return PenInputCalculator;
             }
 
             throw new Exception("Unknown input device type");
@@ -30,15 +30,12 @@ namespace WacomInkDemoUWP
 
         static PathPoint MouseAndTouchInputCalculator(PointerData previous, PointerData current, PointerData next)
         {
-            float? normVelocity = current.ComputeValueBasedOnSpeed(previous, next, 0.0f, 1.0f);
-
-            if (normVelocity == null)
-                return null;
+            float normVelocity = current.ComputeValueBasedOnSpeed(previous, next, 0.0f, 1.0f) ?? 0.5f;
 
             PathPoint pp = new PathPoint(current.X, current.Y)
             {
-                Size = MathFunctions.MapTo(normVelocity.Value, new Range(0.0f, 1.0f), new Range(4.0f, 5.0f)),
-                Alpha = MathFunctions.MapTo(normVelocity.Value, new Range(0.0f, 1.0f), new Range(0.05f, 1.0f))
+                Size = MathFunctions.MapTo(normVelocity, new Range(0.0f, 1.0f), new Range(4.0f, 5.0f)),
+                Alpha = MathFunctions.MapTo(normVelocity, new Range(0.0f, 1.0f), new Range(0.05f, 1.0f))
             };
 
             return pp;
@@ -46,34 +43,27 @@ namespace WacomInkDemoUWP
 
         static PathPoint PenInputCalculator(PointerData previous, PointerData current, PointerData next)
         {
-            float? normVelocity = current.ComputeValueBasedOnSpeed(previous, next, 0.0f, 1.0f);
+			float pressure = current.Force ?? 0.8f;
 
-            if (normVelocity == null)
-                return null;
+			float cosAltitudeAngle = (float)Math.Cos(current.AltitudeAngle.Value);
+			float tiltScale = 0.5f + cosAltitudeAngle;
 
-            float cosAltitudeAngle = (float)Math.Cos(current.AltitudeAngle.Value);
-            float tiltScale = 0.5f + cosAltitudeAngle;
-            float size = MathFunctions.MapTo(normVelocity.Value, new Range(0.0f, 1.0f), new Range(4.0f, 5.0f));
+			float size = MathFunctions.MapTo(pressure, new Range(0.0f, 1.0f), new Range(1.0f, 5.0f));
 
-            PathPoint pp = new PathPoint(current.X, current.Y)
-            {
-                Size = size
-            };
+            PathPoint pp = new PathPoint(current.X, current.Y);
+			pp.Size = size;
 
-            if (current.Force.HasValue)
-            {
-                pp.Alpha = MathFunctions.MapTo(current.Force.Value, new Range(0.0f, 1.0f), new Range(0.1f, 1.0f));
-            }
-            else
-            {
-                pp.Alpha = MathFunctions.MapTo(normVelocity.Value, new Range(0.0f, 1.0f), new Range(0.05f, 1.0f));
-            }
+			float alpha = 0.14f + 20.0f * (float)Math.Exp(5.0 * pressure - 7.6);
 
-            pp.Rotation = current.ComputeNearestAzimuthAngle(previous);
-            pp.ScaleX = tiltScale;
-            pp.OffsetX = 0.5f * size * tiltScale;
+			if (alpha > 1.0f)
+				alpha = 1.0f;
 
-            return pp;
+			pp.Alpha = alpha;
+
+			pp.ScaleY = tiltScale;
+			pp.OffsetY = 0.5f * size * tiltScale;
+
+			return pp;
         }
     }
 }

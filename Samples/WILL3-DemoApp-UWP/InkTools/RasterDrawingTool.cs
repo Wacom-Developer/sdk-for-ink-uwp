@@ -2,7 +2,7 @@
 
 namespace WacomInkDemoUWP
 {
-    public abstract class RasterDrawingTool : DrawingTool
+    abstract class RasterDrawingTool : DrawingTool
     {
         public RasterDrawingTool(string uri) : base(uri)
         {
@@ -12,7 +12,7 @@ namespace WacomInkDemoUWP
         {
             get
             {
-                return ((AppRasterBrush)Paint.Brush).ParticleBrush;
+                return ((AppRasterBrush)Brush).ParticleBrush;
             }
         }
     }

@@ -3,7 +3,7 @@ using System.Numerics;
 
 namespace WacomInkDemoUWP
 {
-    public static class GeometryFactory
+    static class GeometryFactory
     {
         public static Vector2[] CreateSquare()
         {
@@ -12,16 +12,6 @@ namespace WacomInkDemoUWP
                 new Vector2(-0.5f, -0.5f),
                 new Vector2(0.5f, -0.5f),
                 new Vector2(0.5f, 0.5f),
-                new Vector2(-0.5f, 0.5f)
-            };
-        }
-
-        public static Vector2[] CreateTriangle()
-        {
-            return new Vector2[]
-            {
-                new Vector2(-0.5f, -0.5f),
-                new Vector2(0.5f, 0.0f),
                 new Vector2(-0.5f, 0.5f)
             };
         }
@@ -55,6 +45,5 @@ namespace WacomInkDemoUWP
                 new Vector2(-halfW, halfH)
             };
         }
-
     }
 }

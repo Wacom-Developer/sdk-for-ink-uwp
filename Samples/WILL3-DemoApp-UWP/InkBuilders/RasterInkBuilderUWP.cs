@@ -5,19 +5,10 @@ namespace WacomInkDemoUWP
 {
     class RasterInkBuilderUWP : StockRasterInkBuilder
     {
-        public bool UseIntermediatePoints { get; set; }
+        public bool UseIntermediatePoints { get; set; } = true;
 
-        public SensorDataAccumulator SensorDataAccumulator { get; set; }
-
-        public RasterInkBuilderUWP(bool storeSensorData = false)
+        public RasterInkBuilderUWP()
         {
-            UseIntermediatePoints = true;
-
-            if (storeSensorData)
-            {
-                SensorDataAccumulator = new SensorDataAccumulator();
-                SensorDataAccumulator.SetDataProvider(PointerDataProvider);
-            }
         }
 
         public void UpdateParticleInkPipeline(LayoutMask layoutMask, Calculator calculator, float spacing, float constSize = 1.0f)
@@ -32,12 +23,6 @@ namespace WacomInkDemoUWP
         public void AddPointsFromEvent(Phase phase, PointerEventArgs args)
         {
             PointerDataProvider.AddPointsFromEvent(phase, args, UseIntermediatePoints);
-
-            if (SensorDataAccumulator != null)
-            {
-                SensorDataAccumulator.Process();
-            }
         }
-
     }
 }

@@ -1,18 +1,16 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using System.Numerics;
 using Windows.Foundation;
 using Windows.UI.Core;
 
 namespace WacomInkDemoUWP
 {
-    public class MoveSelectedStrokesOperation : UserOperation
+    class MoveSelectedStrokesOperation : UserOperation
     {
-        private Point       m_origin;
-        private Matrix3x2   m_transform;
+        private Point m_origin;
+		private Vector2 m_offsetFromOrigin = Vector2.Zero;
 
-        public Rect BoundingRect { get; set; } = Rect.Empty;
-        public OperationMode SelectionMode { get; set; }
-                                                                                
         public MoveSelectedStrokesOperation(InkPanelController controller)
             : base(controller)
         {
@@ -21,45 +19,55 @@ namespace WacomInkDemoUWP
         public override void OnPointerPressed(PointerEventArgs args)
         {
             m_origin = args.CurrentPoint.Position;
-            m_transform = Matrix3x2.Identity;
+			m_offsetFromOrigin = Vector2.Zero;
 
-            m_controller.ViewInvalidateSceneAndOverlay();
-        }
+            m_controller.ViewInvalidateSceneAndOverlay();			
+		}
 
         public override void OnPointerMoved(PointerEventArgs args)
         {
-            m_transform = Matrix3x2.CreateTranslation(OffsetFromOrigin(args.CurrentPoint.Position));
+			CalculateOffsetFromOrigin(args.CurrentPoint.Position);
 
-        }
+			m_controller.ViewInvalidateOverlay();
+		}
 
         public override void OnPointerReleased(PointerEventArgs args)
         {
-            if (BoundingRect != Rect.Empty)
-            {
-                var offset = OffsetFromOrigin(args.CurrentPoint.Position);
+			CalculateOffsetFromOrigin(args.CurrentPoint.Position);
 
-                BoundingRect = new Rect(BoundingRect.X + offset.X, BoundingRect.Y + offset.Y, BoundingRect.Width, BoundingRect.Height);
+            m_controller.ModelMoveSelectedStrokes(m_offsetFromOrigin);
 
-                m_controller.ModelMoveSelectedStrokes(Matrix3x2.CreateTranslation(offset));
-            }
-            else
-            {
-                System.Diagnostics.Debugger.Break();
-            }
-        }
+			m_offsetFromOrigin = Vector2.Zero;
 
-        public override void UpdateView(InkPanelModel model, InkPanelView view)
+			m_controller.ViewInvalidateOverlay();
+		}
+
+		public override void UpdateView(InkPanelModel model, InkPanelView view)
         {
-            m_controller.ViewInvalidateOverlay();
-            view.TryResize();
-            view.TryRedrawAllStrokes(model.Strokes.Where(stroke => !model.SelectedStrokes.Contains(stroke.Id)));
-            view.TryOverlayRedraw(model, m_transform);
-        }
+			view.TryResize();
 
-        private Vector2 OffsetFromOrigin(Point p)
+			Func<Stroke, bool> filter = m_controller.Selection.GetNotSelectedStrokesFilter();
+
+			view.TryRedrawAllStrokes(model.Strokes, filter);
+			view.TryOverlayRedraw(model, m_controller.Selection, m_offsetFromOrigin);
+		}
+
+		public override UserOperation DetermineCurrentOperation(PointerEventArgs args)
+		{
+            if (m_controller.Selection.HitTest(args.CurrentPoint.Position))
+            {
+				// Begin move operation
+				return this;
+			}
+
+			m_controller.ClearSelection();
+
+			return m_controller.IdleOp.DetermineCurrentOperation(args);
+		}
+
+		private void CalculateOffsetFromOrigin(Point p)
         {
-            return new Vector2((float)(p.X - m_origin.X), (float)(p.Y - m_origin.Y));
+			m_offsetFromOrigin = new Vector2((float)(p.X - m_origin.X), (float)(p.Y - m_origin.Y));
         }
-
     }
 }

@@ -1,16 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using Wacom.Ink;
-using Wacom.Ink.Geometry;
 using Wacom.Ink.Manipulations;
 using Wacom.Ink.Rendering;
 using Wacom.Ink.Serialization.Model;
 using Windows.Foundation;
+
 using GeometryVectorBrush = Wacom.Ink.Geometry.VectorBrush;
 using UimBlendMode = Wacom.Ink.Serialization.Model.BlendMode;
 using UimBrush = Wacom.Ink.Serialization.Model.Brush;
@@ -21,7 +20,7 @@ using UimVectorBrush = Wacom.Ink.Serialization.Model.VectorBrush;
 
 namespace WacomInkDemoUWP
 {
-    public class InkPanelModel
+    class InkPanelModel
     {
         #region Fields
 
@@ -33,8 +32,6 @@ namespace WacomInkDemoUWP
         #region Properties
 
         public ObservableCollection<Stroke> Strokes { get; } = new ObservableCollection<Stroke>();
-        //public List<ColoredShape> CustomShapes { get; set; } = new List<ColoredShape>();
-        public List<Identifier> SelectedStrokes { get; set; } = new List<Identifier>();
 
         #endregion
 
@@ -44,11 +41,10 @@ namespace WacomInkDemoUWP
 
         #region Interface
 
-        public void ClearState()
+        public void Clear()
         {
-            //CustomShapes.Clear();
             Strokes.Clear();
-            SelectedStrokes.Clear();
+            
             m_spatialModel.Clear();
             m_brushes.Clear();
         }
@@ -76,7 +72,7 @@ namespace WacomInkDemoUWP
                     uimStroke.Spline.ToSpline(),
                     m_brushes[brush.Name],
                     style.PathPointProperties,
-                    Paint.RenderModeUriToBlendMode(style.RenderModeUri));
+                    AppBrush.RenderModeUriToBlendMode(style.RenderModeUri));
             }
             else if (brush is UimRasterBrush)
             {
@@ -85,7 +81,7 @@ namespace WacomInkDemoUWP
                     uimStroke.Spline.ToSpline(),
                     m_brushes[brush.Name],
                     style.PathPointProperties,
-                    Paint.RenderModeUriToBlendMode(style.RenderModeUri),
+					AppBrush.RenderModeUriToBlendMode(style.RenderModeUri),
                     uimStroke.RandomSeed);
             }
 
@@ -128,16 +124,16 @@ namespace WacomInkDemoUWP
 
         internal async Task LoadStrokesFromModel(InkModel inkModel, Graphics graphics)
         {
-            ClearState();
+            Clear();
 
             foreach (var vb in inkModel.Brushes.VectorBrushes)
             {
-                RegisterVectorPaint(vb);
+                RegisterVectorBrush(vb);
             }
 
             foreach (var rb in inkModel.Brushes.RasterBrushes)
             {
-                await RegisterRasterPaintAsync(rb, graphics);
+                await RegisterRasterBrushAsync(rb, graphics);
             }
 
             if (inkModel.InkTree.Root != null)
@@ -237,7 +233,6 @@ namespace WacomInkDemoUWP
                 atIndex = Strokes.Count;
             }
 
-            // FIX: modifying the Strokes collection from this thread is dangerous
             Strokes.Insert(atIndex, stroke);
             AddStrokeToSpatialModel(stroke);
 
@@ -268,38 +263,29 @@ namespace WacomInkDemoUWP
             return -1;
         }
 
-        public void MoveSelectedStrokes(Matrix3x2 transform)
+        public void MoveSelectedStrokes(Matrix3x2 transform, Selection selection)
         {
-            foreach (Stroke stroke in Strokes.Where(s => SelectedStrokes.Contains(s.Id)))
+            foreach (Stroke stroke in Strokes.Where(s => selection.Contains(s.Id)))
             {
                 if (stroke is VectorStroke vectorStroke)
                 {
-                    Spline transformedSpline = TransformUtils.TransformSplineXY(stroke.Spline, transform);
-
                     m_spatialModel.Remove(stroke);
                     Stroke.TransformPath(vectorStroke.Spline.Path, transform, 1f);
-                    stroke.RebuildCache(true);
+                    stroke.RebuildCache();
                     m_spatialModel.TryAdd(vectorStroke);
                 }
             }
         }
 
-        public double RebuildStrokesCache(bool useNewInterpolator)
+        public void RebuildStrokesCache()
         {
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
-
             foreach (var stroke in Strokes)
             {
-                stroke.RebuildCache(useNewInterpolator);
+                stroke.RebuildCache();
             }
-
-            sw.Stop();
-
-            return sw.Elapsed.TotalMilliseconds;
         }
 
-        public void RegisterVectorPaint(UimVectorBrush uimVectorBrush)
+        public void RegisterVectorBrush(UimVectorBrush uimVectorBrush)
         {
             if (m_brushes.TryGetValue(uimVectorBrush.Name, out _))
             {
@@ -316,61 +302,19 @@ namespace WacomInkDemoUWP
                 vectorBrush = new GeometryVectorBrush(uimVectorBrush.BrushPolygons);
             }
 
-            // FIX: Paint needs style of stroke
             AppBrush vectorPaint = new AppBrush(uimVectorBrush.Name, vectorBrush);
             m_brushes.Add(uimVectorBrush.Name, vectorPaint);
         }
 
-        public async Task RegisterRasterPaintAsync(RasterBrush uimRasterBrush, Graphics graphics)
+        public async Task RegisterRasterBrushAsync(UimRasterBrush uimRasterBrush, Graphics graphics)
         {
             if (m_brushes.TryGetValue(uimRasterBrush.Name, out _))
             {
                 return;
             }
 
-            /*			int mipMapLevelsCount = uimRasterBrush.ShapeTextureURIs.Count;
-
-                        if (mipMapLevelsCount == 0)
-                        {
-                            throw new Exception($"Unexpected raster brush without shape textures: {uimRasterBrush}");
-                        }
-
-                        string uri = uimRasterBrush.ShapeTextureURIs[0];
-                        //if (uri.Contains('/'))
-                        //{
-                        //	uri = uri.Replace('/', '\\');
-                        //}
-                        PixelData shapePixelData = await Utils.GetPixelDataAsync(uri);
-                        PixelData curPixelData = shapePixelData;
-
-                        for (int i = 1; i < mipMapLevelsCount; i++)
-                        {
-                            uri = uimRasterBrush.ShapeTextureURIs[i];
-                            //if (uri.Contains('/'))
-                            //{
-                            //	uri = uri.Replace('/', '\\');
-                            //}
-                            PixelData newPixelData = await Utils.GetPixelDataAsync(uri);
-                            curPixelData.Next = newPixelData;
-                            curPixelData = newPixelData;
-                        }
-
-                        if (uimRasterBrush.FillTextureURI.Contains('/'))
-                        {
-                            uimRasterBrush.FillTextureURI.Replace('/', '\\');
-                        }
-                        PixelData fillPixelData = await Utils.GetPixelDataAsync(uimRasterBrush.FillTextureURI);*/
-
-            /*			ParticleBrush particleBrush = new ParticleBrush();
-                        particleBrush.ShapeTexture = graphics.CreateTexture(shapePixelData);
-                        particleBrush.FillTexture = graphics.CreateTexture(fillPixelData);
-                        particleBrush.FillTileSize = new Size(uimRasterBrush.FillWidth, uimRasterBrush.FillHeight);
-                        particleBrush.RotationMode = (ParticleRotationMode)uimRasterBrush.RotationMode;
-                        particleBrush.Scattering = uimRasterBrush.Scattering;*/
-
             int mipMapLevelsCount = uimRasterBrush.ShapeTextures.Count;
 
-            // FIX: Paint needs stroke style
             PngDataFromByteArrayProvider[] shapeTextureProviders = new PngDataFromByteArrayProvider[mipMapLevelsCount];
 
             int k = 0;
@@ -391,16 +335,10 @@ namespace WacomInkDemoUWP
                 new PngDataFromByteArrayProvider(uimRasterBrush.FillTexture),
                 shapeTextureProviders);
 
-            // FIX: this could be done elsewhere, so the whole method would not need async execution and access to a Graphics object.
             await appRasterBrush.LoadBrushTexturesAsync(graphics);
 
             m_brushes.Add(uimRasterBrush.Name, appRasterBrush);
         }
-
-        //public void OverlayAddShape(ColoredShape shape)
-        //{
-        //    CustomShapes.Add(shape);
-        //}
 
         public EraseStrokePartManipulation CreateEraseStrokePartOperation() => new EraseStrokePartManipulation(m_spatialModel);
 
@@ -410,25 +348,14 @@ namespace WacomInkDemoUWP
 
         public SelectWholeStrokeManipulation CreateSelectWholeStrokeOperation() => new SelectWholeStrokeManipulation(m_spatialModel);
 
-        public void EnsureStrokesCacheExists(bool useNewInterpolator)
-        {
-            foreach (var stroke in Strokes)
-            {
-                if (!stroke.HasCache())
-                {
-                    stroke.RebuildCache(useNewInterpolator);
-                }
-            }
-        }
-
         #endregion
 
         #region Implementation
 
         private void AddStrokeToSpatialModel(Stroke stroke)
         {
-            // TODO: Fix once raster strokes can be manipulated
-            //if (stroke.Tag != EraseOperationReplayer.EraserTag)
+            // Manipulations of raster strokes are not supported yet
+            if (stroke is VectorStroke)
             {
                 m_spatialModel.TryAdd(stroke);
             }

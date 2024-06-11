@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using Wacom.Ink;
@@ -8,26 +7,24 @@ using Wacom.Ink.Manipulations;
 using Wacom.Ink.Rendering;
 using Windows.Foundation;
 using Windows.System.Threading;
-using Windows.UI;
 using Windows.UI.Core;
 
 namespace WacomInkDemoUWP
 {
-    public enum OperationMode
+	public enum OperationMode
     {
         VectorDrawing,
         RasterDrawing,
         EraseStrokePart,
         EraseWholeStroke,
         SelectStrokePart,
-        SelectStrokeWhole,
+		SelectWholeStroke,
         MoveSelected,
     }
 
-    public class InkPanelController
+    class InkPanelController
     {
         #region Fields
-        private readonly UserOperation EmptyOp;
 
         private readonly InkPanelView m_view = null;
         private readonly InkPanelModel m_model = null;
@@ -35,53 +32,57 @@ namespace WacomInkDemoUWP
         private PointerManager m_pointerManager;
 
         private OperationMode m_operationMode = OperationMode.VectorDrawing;
-        private UserOperation m_currentOperation = null;
 
-        #endregion
+		private UserOperation m_currentOperation = null;
 
-        #region Properties
+		#endregion
 
-        public bool UseNewInterpolator { get; } = true;
-        public DrawVectorStrokeOperation DrawVectorStrokeOp { get; }
+		#region Properties
+
+		public IdleOperation IdleOp { get; }
+		public DrawVectorStrokeOperation DrawVectorStrokeOp { get; }
         public DrawRasterStrokeOperation DrawRasterStrokeOp { get; }
         public EraseStrokePartOperation EraseStrokePartOp { get; }
         public EraseWholeStrokeOperation EraseWholeStrokeOp { get; }
         public SelectStrokePartOperation SelectStrokePartOp { get; }
         public SelectWholeStrokeOperation SelectWholeStrokeOp { get; }
         public MoveSelectedStrokesOperation MoveSelectedStrokesOp { get; }
+		public Selection Selection { get; } = new Selection();
 
-        #endregion
+		#endregion
 
+		#region Constructors
 
-        #region Constructors
-
-        public InkPanelController(InkPanelModel model, InkPanelView view)
+		public InkPanelController(InkPanelModel model, InkPanelView view)
         {
             m_model = model;
             m_view = view;
 
-            DrawVectorStrokeOp = new DrawVectorStrokeOperation(this);
-            DrawRasterStrokeOp = new DrawRasterStrokeOperation(this);
+			Selection = new Selection();
 
+			DrawVectorStrokeOp = new DrawVectorStrokeOperation(this);
+            DrawRasterStrokeOp = new DrawRasterStrokeOperation(this);
             EraseStrokePartOp = new EraseStrokePartOperation(this);
             EraseWholeStrokeOp = new EraseWholeStrokeOperation(this);
-
             SelectStrokePartOp = new SelectStrokePartOperation(this);
             SelectWholeStrokeOp = new SelectWholeStrokeOperation(this);
-
             MoveSelectedStrokesOp = new MoveSelectedStrokesOperation(this);
+			IdleOp = new IdleOperation(this);
 
-            EmptyOp = new UserOperation(this);
-
-            m_currentOperation = EmptyOp;
-
+            m_currentOperation = IdleOp;
         }
 
-        #endregion
+		#endregion
 
-        #region Interface
+		#region Interface
 
-        public void InitializeMainLoop()
+		public UserOperation CurrentOperation
+        {
+            get => m_currentOperation;
+            set => m_currentOperation = value;
+		}
+        
+		public void InitializeMainLoop()
         {
             m_view.InitializeMainLoop(MainLoopWorkItem());
         }
@@ -92,122 +93,59 @@ namespace WacomInkDemoUWP
             m_view.Dispose();
         }
 
-        public void SetOperationMode(OperationMode mode)
+        public OperationMode OperationMode
         {
-            if (m_operationMode != mode)
+            get
             {
-                m_operationMode = mode;
-                m_view.InvalidateSceneAndOverlay();
+                return m_operationMode;
+			}
+			set
+            {
+                if (m_operationMode != value)
+                {
+                    m_operationMode = value;
+
+                    ClearSelection();
+
+					m_view.InvalidateSceneAndOverlay();
+                }
             }
         }
 
         public void MeasureSelectedStrokes()
         {
-            MoveSelectedStrokesOp.BoundingRect = m_view.MeasureBoundingRect(m_model.Strokes.Where(stroke => m_model.SelectedStrokes.Contains(stroke.Id)));
-        }
+            Selection.BoundingRect = m_view.MeasureBoundingRect(m_model.Strokes.Where(stroke => Selection.Contains(stroke.Id)));
+		}
 
-
-        public void Clear()
+		public void Clear()
         {
-            m_model.ClearState();
-            ClearSelection();
-            m_currentOperation = EmptyOp;
+			Selection.Clear();
+
+			m_model.Clear();
+
+            m_currentOperation = IdleOp;
 
             m_view.InvalidateSceneAndOverlay();
             m_view.TryRedrawAllStrokes(m_model.Strokes);
             m_view.StopProcessingEvents();
         }
 
-        public double RebuildAndRepaintStrokesAndOverlay()
-        {
-            double milliseconds = m_model.RebuildStrokesCache(UseNewInterpolator);
+		public void ResetOperation()
+		{
+			m_currentOperation = IdleOp;
+		}
 
-            if (m_view.IsGraphicsInitialized())
+		public void ClearSelection()
+		{
+            if (Selection.Count > 0)
             {
-                m_view.TriggerRedrawSceneAndOverlay();
+                Selection.Clear();
+
+                m_view.InvalidateSceneAndOverlay();
             }
+		}
 
-            return milliseconds;
-        }
-
-        #region Model API
-
-        public VectorStroke ModelCreateVectorStroke(Spline spline, Color color, VectorDrawingTool tool, string tag = null)
-        {
-            float viewToModelScale;
-
-            if (m_view.TransformMatrix.IsIdentity)
-            {
-                viewToModelScale = 1.0f;
-            }
-            else
-            {
-                var viewToModelMatrix = m_view.InverseTransformMatrix;
-
-                viewToModelScale = viewToModelMatrix.GetScale();
-
-                Stroke.TransformPath(spline.Path, viewToModelMatrix, viewToModelScale);
-            }
-
-            VectorStroke stroke = new VectorStroke(
-                Identifier.FromNewGuid(),
-                spline,
-                color,
-                tool.Paint.Brush,
-                tool.ConstSize,     // FIX: multiply by viewToModelScale?
-                tool.ConstRotation, // FIX: must be rotated if the view is rotated
-                tool.Paint.ScaleX,
-                tool.Paint.ScaleY,
-                tool.Paint.OffsetX * viewToModelScale,
-                tool.Paint.OffsetY * viewToModelScale,
-                viewToModelScale,
-                tool.Paint.StrokeBlendMode,
-                0,
-                tag);
-
-            stroke.RebuildCache(UseNewInterpolator);
-
-            return stroke;
-        }
-
-        public RasterStroke ModelCreateRasterStroke(Spline spline, Color color, RasterDrawingTool tool, uint randomSeed, string tag = null)
-        {
-            float viewToModelScale;
-
-            if (m_view.TransformMatrix.IsIdentity)
-            {
-                viewToModelScale = 1.0f;
-            }
-            else
-            {
-                var viewToModelMatrix = m_view.InverseTransformMatrix;
-
-                viewToModelScale = viewToModelMatrix.GetScale();
-
-                Stroke.TransformPath(spline.Path, viewToModelMatrix, viewToModelScale);
-            }
-
-            RasterStroke stroke = new RasterStroke(
-                Identifier.FromNewGuid(),
-                spline,
-                color,
-                tool.Paint.Brush,
-                tool.ConstSize,     // FIX: multiply by viewToModelScale?
-                tool.ConstRotation, // FIX: must be rotated if the view is rotated
-                tool.Paint.ScaleX,
-                tool.Paint.ScaleY,
-                tool.Paint.OffsetX * viewToModelScale,
-                tool.Paint.OffsetY * viewToModelScale,
-                viewToModelScale,
-                tool.Paint.StrokeBlendMode,
-                randomSeed,
-                0,
-                tag);
-
-            stroke.RebuildCache(UseNewInterpolator);
-
-            return stroke;
-        }
+		#region Model API
 
         public int ModelFindStrokeIndex(Identifier id)
         {
@@ -222,16 +160,19 @@ namespace WacomInkDemoUWP
         public void ModelStoreStroke(Stroke stroke, int atIndex = -1)
         {
             m_model.StoreStroke(stroke, atIndex);
-        }
 
-        public void ModelSelectStroke(Identifier id)
-        {
-            m_model.SelectedStrokes.Add(id);
-        }
+			stroke.RebuildCache();
+		}
 
-        public void ModelMoveSelectedStrokes(Matrix3x2 transform)
+        public void ModelMoveSelectedStrokes(Vector2 offset)
         {
-            m_model.MoveSelectedStrokes(transform);
+			Rect bb = Selection.BoundingRect;
+
+			Selection.BoundingRect = new Rect(bb.X + offset.X, bb.Y + offset.Y, bb.Width, bb.Height);
+
+            Matrix3x2 transform = Matrix3x2.CreateTranslation(offset);
+
+			m_model.MoveSelectedStrokes(transform, Selection);
         }
 
         public EraseStrokePartManipulation CreateEraseStrokePartOperation()
@@ -251,12 +192,7 @@ namespace WacomInkDemoUWP
 
         public SelectWholeStrokeManipulation CreateSelectWholeStrokeOperation()
         {
-            return m_model.CreateSelectWholeStrokeOperation();
-        }
-
-        public void ModelEnsureStrokesCacheExists()
-        {
-            m_model.EnsureStrokesCacheExists(UseNewInterpolator);
+            return m_model.CreateSelectWholeStrokeOperation();        
         }
 
         #endregion
@@ -293,7 +229,7 @@ namespace WacomInkDemoUWP
             m_view.ClearCurrentStrokeLayer();
         }
 
-        public void ViewInvalidateSceneAndOverlay()
+		public void ViewInvalidateSceneAndOverlay()
         {
             m_view.InvalidateSceneAndOverlay();
         }
@@ -313,11 +249,6 @@ namespace WacomInkDemoUWP
             m_view.Scroll(dx, dy);
         }
 
-        public Vector2 ViewTransformToModel(Vector2 point)
-        {
-            return Vector2.Transform(point, m_view.InverseTransformMatrix);
-        }
-
         #endregion
 
         #endregion
@@ -333,7 +264,7 @@ namespace WacomInkDemoUWP
                 return;
             }
 
-            DetermineCurrentOperation(args);
+			m_currentOperation = m_currentOperation.DetermineCurrentOperation(args);
 
             m_currentOperation.OnPointerPressed(args);
         }
@@ -361,140 +292,7 @@ namespace WacomInkDemoUWP
             }
 
             m_currentOperation.OnPointerReleased(args);
-            ResetOperation();
-        }
 
-        private void OnInkCanvasPointerWheelChanged(object sender, PointerEventArgs args)
-        {
-            DetermineCurrentOperation(args);
-            m_currentOperation.OnPointerWheelChanged(args);
-            ResetOperation();
-        }
-
-        private void ResetOperation()
-        {
-            m_currentOperation = EmptyOp;
-        }
-
-        private void DetermineCurrentOperation(PointerEventArgs args)
-        {
-            Debug.WriteLine($"DetermineCurrentOperation opMode={m_operationMode}  currentOp is {m_currentOperation.GetType().Name}");
-
-            if (m_currentOperation != EmptyOp)
-            {
-                return;
-            }
-
-            if (args.CurrentPoint.Properties.IsLeftButtonPressed)
-            {
-                bool clearSelection = m_model.SelectedStrokes.Any();
-
-                if (clearSelection &&
-                    MoveSelectedStrokesOp.BoundingRect.Contains(args.CurrentPoint.Position))
-                {
-                    // Click inside selection rect 
-                    switch (m_operationMode)
-                    {
-                        case OperationMode.SelectStrokePart:
-                        case OperationMode.SelectStrokeWhole:
-                        case OperationMode.MoveSelected:
-                            clearSelection = false;
-                            break;
-
-                        default:
-                            // One of the drawing or erasing modes. Leave clearSelection == true;
-                            break;
-                    }
-                }
-
-                if (m_operationMode == OperationMode.VectorDrawing)
-                {
-                    m_currentOperation = DrawVectorStrokeOp;
-                }
-                else if (m_operationMode == OperationMode.RasterDrawing)
-                {
-                    m_currentOperation = DrawRasterStrokeOp;
-                }
-                else if (m_operationMode == OperationMode.EraseStrokePart)
-                {
-                    m_currentOperation = EraseStrokePartOp;
-                }
-                else if (m_operationMode == OperationMode.EraseWholeStroke)
-                {
-                    m_currentOperation = EraseWholeStrokeOp;
-                }
-                else if (m_operationMode == OperationMode.MoveSelected)
-                {
-                    if (clearSelection)
-                    {
-                        RevertToSelectionMode();
-                    }
-                    else
-                    {
-                        // Restore current op to MoveSelected
-                        m_currentOperation = MoveSelectedStrokesOp;
-                    }
-                }
-                else if (m_operationMode == OperationMode.SelectStrokePart)
-                {
-                    if (!SwitchToMoveMode(args.CurrentPoint.Position))
-                    {
-                        Debug.WriteLine($"  Op => SelectStrokePartOp (no switch to move)");
-                        m_currentOperation = SelectStrokePartOp;
-                    }
-                    else
-                    {
-                        // Restore current op to MoveSelected
-                        m_currentOperation = MoveSelectedStrokesOp;
-                    }
-                }
-                else if (m_operationMode == OperationMode.SelectStrokeWhole)
-                {
-                    if (!SwitchToMoveMode(args.CurrentPoint.Position))
-                    {
-                        m_currentOperation = SelectWholeStrokeOp;
-                    }
-                    else
-                    {
-                        // Restore current op to SelectStrokeWhole
-                        m_currentOperation = MoveSelectedStrokesOp;
-                    }
-                }
-                if (clearSelection)
-                {
-                    ClearSelection();
-                    m_view.InvalidateSceneAndOverlay();
-                }
-            }
-        }
-
-        private void ClearSelection()
-        {
-            m_model.SelectedStrokes.Clear();
-            MoveSelectedStrokesOp.BoundingRect = Rect.Empty;
-            if (m_operationMode == OperationMode.MoveSelected)
-            {                
-                RevertToSelectionMode();
-            }
-        }
-
-        private bool SwitchToMoveMode(Point currentPosition)
-        {
-            if (MoveSelectedStrokesOp.BoundingRect.Contains(currentPosition))
-            {
-                // Click inside selection rect - switch to move mode
-                MoveSelectedStrokesOp.SelectionMode = m_operationMode;
-                m_operationMode = OperationMode.MoveSelected;
-                m_currentOperation = MoveSelectedStrokesOp;
-                return true;
-            }
-            return false;
-        }
-
-        private void RevertToSelectionMode()
-        {
-            m_operationMode = MoveSelectedStrokesOp.SelectionMode;
-            m_currentOperation = MoveSelectedStrokesOp.SelectionMode == OperationMode.SelectStrokePart ? SelectStrokePartOp : (UserOperation)SelectWholeStrokeOp;
         }
 
         #endregion
@@ -512,7 +310,6 @@ namespace WacomInkDemoUWP
                 m_view.AddPointerPressedHandler(OnPointerPressed);
                 m_view.AddPointerMovedHandler(OnPointerMoved);
                 m_view.AddPointerReleasedHandler(OnPointerReleased);
-                m_view.AddPointerWheelChangedHandler(OnInkCanvasPointerWheelChanged);
 
                 // Synchronize frame rendering - start from the first frame
                 uint waitResult = m_view.WaitForSwapChain(1000);
@@ -532,8 +329,7 @@ namespace WacomInkDemoUWP
                     }
 
                     m_view.ProcessEvents(CoreProcessEventsOption.ProcessOneAndAllPending);
-                    //Windows.UI.Color color = m_currentOperation == null ? Windows.UI.Color.FromArgb(0, 0, 0, 0) : m_currentOperation.Color;
-                    //m_view.Update(m_model.Strokes, m_model.CustomShapes, m_inkBuilder, color);
+
                     m_currentOperation.UpdateView(m_model, m_view);
                     presented = m_view.Present();
                 }
@@ -544,10 +340,10 @@ namespace WacomInkDemoUWP
         {
             foreach (var tool in DrawRasterStrokeOp.RasterTools)
             {
-                await ((AppRasterBrush)tool.Paint.Brush).LoadBrushTexturesAsync(sender);
+                await ((AppRasterBrush)tool.Brush).LoadBrushTexturesAsync(sender);
             }
         }
 
-        #endregion
-    }
+		#endregion
+	}
 }

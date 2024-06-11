@@ -6,20 +6,27 @@ using Windows.UI.Core;
 
 namespace WacomInkDemoUWP
 {
-    public class DrawRasterStrokeOperation : DrawStrokeOperation
+    class DrawRasterStrokeOperation : DrawStrokeOperation
     {
         #region Fields
 
-        private readonly RasterInkBuilderUWP m_inkBuilder = new RasterInkBuilderUWP(true);
+        private readonly RasterInkBuilderUWP m_inkBuilder = new RasterInkBuilderUWP();
         private readonly Random m_rand = new Random();
         private uint m_startRandomSeed;
         private DrawStrokeResult m_drawStrokeResult;
 
-        #endregion
+		public readonly List<RasterDrawingTool> RasterTools = new List<RasterDrawingTool>()
+		{
+			new CrayonTool(),
+			new PencilTool(),
+			new WaterBrushTool()
+		};
 
-        #region Constructors
+		#endregion
 
-        public DrawRasterStrokeOperation(InkPanelController controller)
+		#region Constructors
+
+		public DrawRasterStrokeOperation(InkPanelController controller)
             : base(controller)
         {
         }
@@ -29,26 +36,15 @@ namespace WacomInkDemoUWP
         #region Properties
 
         public RasterDrawingTool Tool { get; set; }
+
         public uint RandomSeed
         {
-            get
-            {
-                return m_startRandomSeed;
-            }
+            get => m_startRandomSeed;
         }
 
         #endregion
 
-        #region Interface
-
-        public readonly List<RasterDrawingTool> RasterTools = new List<RasterDrawingTool>()
-        {
-            new CrayonTool(),
-            new PencilTool(),
-            new WaterBrushTool()
-        };
-
-        #region UserOperation API
+        #region Overrides from UserOperation
 
         public override void OnPointerPressed(PointerEventArgs args)
         {
@@ -68,32 +64,22 @@ namespace WacomInkDemoUWP
         {
             m_controller.ViewReleaseInputPointer();
             m_inkBuilder.AddPointsFromEvent(Phase.End, args);
-            // TODO: Maybe ViewRenderNewRasterStrokeSegment?
+
             m_controller.ViewRenderNewRasterStrokeSegment(m_inkBuilder.GetCurrentInterpolatedPaths(), Tool, Color, ref m_drawStrokeResult);
+
             OnStrokeEnd();
-            m_ended = true;
-        }
+		}
 
         public override void UpdateView(InkPanelModel model, InkPanelView view)
         {
             view.TryResize();
             view.TryRedrawAllStrokes(model.Strokes);
-            view.TryOverlayRedraw(model);
 
             if (m_inkBuilder.HasNewPoints)
             {
                 view.RenderNewRasterStrokeSegment(m_inkBuilder.GetCurrentInterpolatedPaths(), Tool, Color, ref m_drawStrokeResult);
             }
-
-
-            if (m_ended)
-            {
-                //OperationEnd();
-                m_ended = false;
-            }
         }
-
-        #endregion
 
         #endregion
 
@@ -101,39 +87,26 @@ namespace WacomInkDemoUWP
 
         protected override void OnStrokeEnd()
         {
-            // TODO: Maybe pass here what's necessary to build cache in CreateRasterStroke?
-            // TODO: Do we pass the entire operation or just the necessary stuff (paint, seed, color)
-
-            RasterStroke stroke = m_controller.ModelCreateRasterStroke(
+            RasterStroke stroke = CreateRasterStroke(
                 m_inkBuilder.SplineAccumulator.Accumulated.Clone(),
                 Color,
                 Tool,
-                RandomSeed,
-                m_tag);
-
-            //m_controller.Replayer.EnqueueCommand(new DrawStrokeCommand(stroke, m_controller));
+                RandomSeed);
 
             // Store the stroke in the collection
-            if (m_keepStroke)
-            {
-                m_controller.ModelStoreStroke(stroke);
-                m_controller.ViewDrawCurrentStrokeLayer();
-                m_controller.ViewClearCurrentStrokeLayer();
-            }
-        }
+            m_controller.ModelStoreStroke(stroke);
+            m_controller.ViewDrawCurrentStrokeLayer();
+            m_controller.ViewClearCurrentStrokeLayer();
+
+			m_controller.ResetOperation();
+		}
 
         protected override void SetupInkTool(PointerEventArgs args)
         {
-            //if (UseRandomInkColor)
-            //{
-            //	Color = Utils.GetRandomColor();
-            //}
-
             Calculator calculator = Tool.GetCalulator(args.CurrentPoint.PointerDevice, out LayoutMask layoutMask);
 
             m_inkBuilder.UpdateParticleInkPipeline(layoutMask, calculator, Tool.ParticleSpacing);
 
-            //m_inkBuilder.SplineInterpolator.Spacing = Spacing;
             m_inkBuilder.SplineProducer.KeepAllData = true;
         }
 

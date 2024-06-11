@@ -2,7 +2,7 @@
 
 namespace WacomInkDemoUWP
 {
-    public static class MathFunctions
+    static class MathFunctions
     {
         public static float Sigmoid(float t, float k)
         {

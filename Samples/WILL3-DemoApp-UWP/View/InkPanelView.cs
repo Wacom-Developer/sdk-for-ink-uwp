@@ -14,13 +14,12 @@ using Windows.UI.Xaml.Controls;
 
 namespace WacomInkDemoUWP
 {
-
-    public class InkPanelView
+    class InkPanelView
     {
         #region Fields
 
-        private readonly Windows.UI.Color m_backgroundColor = Colors.White;
-        private readonly Windows.UI.Color m_transparentColor = Colors.Transparent;
+        private readonly Color m_backgroundColor = Colors.White;
+        private readonly Color m_transparentColor = Colors.Transparent;
 
         private bool m_redrawAllStrokes;
         private bool m_mustPresent = false;
@@ -29,7 +28,7 @@ namespace WacomInkDemoUWP
         private bool m_redrawOverlay = false;
 
         // WILL 3.0 native objects
-        private readonly Graphics m_graphics = new Graphics();
+        private Graphics m_graphics = new Graphics();
         private Layer m_allStrokesLayer;
         private Layer m_backBufferLayer;
         private Layer m_currentStrokeLayer;
@@ -58,22 +57,6 @@ namespace WacomInkDemoUWP
 
         #region Properties
 
-        public Matrix3x2 TransformMatrix
-        {
-            get
-            {
-                return (m_renderingContext != null) ? m_renderingContext.TransformMatrix : Matrix3x2.Identity;
-            }
-        }
-
-        public Matrix3x2 InverseTransformMatrix
-        {
-            get
-            {
-                return (m_renderingContext != null) ? m_renderingContext.InverseTransformMatrix : Matrix3x2.Identity;
-            }
-        }
-
         public Graphics Graphics
         {
             get
@@ -81,6 +64,11 @@ namespace WacomInkDemoUWP
                 return m_graphics;
             }
         }
+
+        internal CoreDispatcher Dispatcher
+        {
+            get => m_inputSource?.Dispatcher;
+		}
 
         //public delegate void OnGraphicsReady(Graphics graphics);
         //public OnGraphicsReady GraphicsReady;
@@ -99,8 +87,9 @@ namespace WacomInkDemoUWP
             StopProcessingEvents();
             DisposeLayers();
 
-            Utils.SafeDispose(m_graphics);
-        }
+            m_graphics?.Dispose();
+            m_graphics = null;
+		}
 
         #region Input Handling
 
@@ -226,12 +215,8 @@ namespace WacomInkDemoUWP
 
         public void RenderNewVectorStrokeSegment(ProcessorResult<List<List<Vector2>>> rawPolygons, Color color)
         {
-            PolygonUtil.ConvertPolygon(rawPolygons.Addition, m_addedPolygon);
-            PolygonUtil.ConvertPolygon(rawPolygons.Prediction, m_predictedPolygon);
-
-            // Save current transform and set identity
-            var originalModelToViewMatrix = m_renderingContext.TransformMatrix;
-            m_renderingContext.TransformMatrix = Matrix3x2.Identity;
+			rawPolygons.Addition.ToPolygon(m_addedPolygon);
+			rawPolygons.Prediction.ToPolygon(m_predictedPolygon);
 
             // Draw the added stroke
             m_renderingContext.SetTarget(m_currentStrokeLayer);
@@ -248,42 +233,35 @@ namespace WacomInkDemoUWP
             m_renderingContext.DrawLayerAtPoint(m_currentStrokeLayer, updateRect, new Point(updateRect.X, updateRect.Y), BlendMode.Copy);
             m_renderingContext.FillPolygon(m_predictedPolygon, color, BlendMode.Max);
 
-            // Restore transform
-            m_renderingContext.TransformMatrix = originalModelToViewMatrix;
-
             // Reconstruct the scene under the current stroke (only within the updated rectangle)
             ReconstructScene(updateRect);
         }
 
-        public void RenderNewRasterStrokeSegment(ProcessorResult<Path> path, RasterDrawingTool rasterTool, Color color, ref DrawStrokeResult drawStrokeResult)
+        public void RenderNewRasterStrokeSegment(ProcessorResult<Path> stroke, RasterDrawingTool rasterTool, Color color, ref DrawStrokeResult drawStrokeResult)
         {
-            Matrix3x2 viewToModel = m_renderingContext.InverseTransformMatrix;
-            float matrixScale = viewToModel.GetScale();
-
-            Path transformedAddition = new Path(path.Addition);
-            Stroke.TransformPath(transformedAddition, viewToModel, matrixScale);
-
-            Path transformedPrediction = new Path(path.Prediction);
-            Stroke.TransformPath(transformedPrediction, viewToModel, matrixScale);
-
-            m_addedInterpolatedSpline.Assign(transformedAddition, (uint)transformedAddition.LayoutMask);
-            m_predictedInterpolatedSpline.Assign(transformedPrediction, (uint)transformedPrediction.LayoutMask);
+            m_addedInterpolatedSpline.Assign(stroke.Addition, (uint)stroke.Addition.LayoutMask);
+            m_predictedInterpolatedSpline.Assign(stroke.Prediction, (uint)stroke.Prediction.LayoutMask);
 
             // Set the stroke constants
             m_strokeContants.ResetToDefaultValues();
             m_strokeContants.Color = color;
-            m_strokeContants.Size = rasterTool.ConstSize * matrixScale;
+            m_strokeContants.Size = rasterTool.ConstSize;
             m_strokeContants.Rotation = rasterTool.ConstRotation;
-            m_strokeContants.ScaleX = rasterTool.Paint.ScaleX;
-            m_strokeContants.ScaleY = rasterTool.Paint.ScaleY;
-            m_strokeContants.OffsetX = rasterTool.Paint.OffsetX * matrixScale;
-            m_strokeContants.OffsetY = rasterTool.Paint.OffsetY * matrixScale;
+            m_strokeContants.ScaleX = rasterTool.ScaleX;
+            m_strokeContants.ScaleY = rasterTool.ScaleY;
+            m_strokeContants.OffsetX = rasterTool.OffsetX;
+            m_strokeContants.OffsetY = rasterTool.OffsetY;
 
             ParticleBrush brush = rasterTool.RasterBrush;
 
             // Draw the added stroke
             m_renderingContext.SetTarget(m_currentStrokeLayer);
-            drawStrokeResult = m_renderingContext.DrawParticleStroke(m_addedInterpolatedSpline, m_strokeContants, brush, BlendMode.SourceOver, drawStrokeResult.RandomGeneratorSeed);
+            drawStrokeResult = m_renderingContext.DrawParticleStroke(
+                m_addedInterpolatedSpline,
+                m_strokeContants,
+                brush,
+                BlendMode.SourceOver,
+                drawStrokeResult.RandomGeneratorSeed);
 
             Rect updateRect = m_dirtyRectManager.GetUpdateRect(
                 drawStrokeResult.DirtyRect,
@@ -292,7 +270,12 @@ namespace WacomInkDemoUWP
             // Draw the predicted stroke
             m_renderingContext.SetTarget(m_prelimPathLayer);
             m_renderingContext.DrawLayerAtPoint(m_currentStrokeLayer, updateRect, new Point(updateRect.X, updateRect.Y), BlendMode.Copy);
-            m_renderingContext.DrawParticleStroke(m_predictedInterpolatedSpline, m_strokeContants, brush, BlendMode.SourceOver, drawStrokeResult.RandomGeneratorSeed);
+            m_renderingContext.DrawParticleStroke(
+                m_predictedInterpolatedSpline,
+                m_strokeContants,
+                brush,
+                BlendMode.SourceOver,
+                drawStrokeResult.RandomGeneratorSeed);
 
             // Reconstruct the scene under the current stroke (only within the updated rectangle)
             ReconstructScene(updateRect);
@@ -354,16 +337,22 @@ namespace WacomInkDemoUWP
             return m_graphics.WaitForSwapChain(milliseconds);
         }
 
-        public bool Present()
+        bool m_drawOverlayLayer = false;
+
+		public bool Present()
         {
             if (m_mustPresent)
             {
                 // Copy the scene to the back-buffer
                 m_renderingContext.SetTarget(m_backBufferLayer);
 
-                // Draw the translation layer after the scene
                 m_renderingContext.DrawLayer(m_sceneLayer, null, Wacom.Ink.Rendering.BlendMode.Copy);
-                m_renderingContext.DrawLayer(m_translationLayer, null, Wacom.Ink.Rendering.BlendMode.SourceOver); //~~~
+
+                // Draw the translation layer after the scene
+                if (m_drawOverlayLayer)
+                {
+                    m_renderingContext.DrawLayer(m_translationLayer, null, Wacom.Ink.Rendering.BlendMode.SourceOver);
+                }
 
                 // Present back-buffer to the screen
                 m_graphics.Present();
@@ -404,21 +393,35 @@ namespace WacomInkDemoUWP
             StopProcessingEvents();
         }
 
-        public void TryRedrawAllStrokes(IEnumerable<Stroke> strokes)
+        public void TryRedrawAllStrokes(IEnumerable<Stroke> strokes, Func<Stroke, bool> filter = null)
         {
             if (m_redrawAllStrokes)
             {
-                RedrawAllStrokes(strokes);
+                IEnumerable<Stroke> strokesToRedraw = (filter == null) ? strokes : strokes.Where(filter);
+
+				RedrawStrokes(strokesToRedraw);
+
                 m_redrawAllStrokes = false;
             }
         }
 
-        public void TryOverlayRedraw(InkPanelModel model, Matrix3x2? translation = null)
+        public void TryOverlayRedraw(InkPanelModel model, Selection selection, Vector2 translate)
         {
             if (m_redrawOverlay)
             {
-                IEnumerable<Stroke> selStrokes = model.Strokes.Where(s => model.SelectedStrokes.Contains(s.Id));
-                RedrawSelectedStrokes(selStrokes, MeasureBoundingRect(selStrokes), translation);
+                if (selection.Count > 0)
+                {
+					m_drawOverlayLayer = true;
+
+                    IEnumerable<Stroke> selStrokes = model.Strokes.Where(s => selection.Contains(s.Id));
+
+					RedrawSelectedStrokes(selStrokes, selection.BoundingRect, translate);
+				}
+                else
+                {
+                    m_drawOverlayLayer = false;
+				}
+
                 m_redrawOverlay = false;
             }
         }
@@ -430,19 +433,21 @@ namespace WacomInkDemoUWP
             foreach (Stroke stroke in strokes)
             {
                 Rect rcStroke = Rect.Empty;
+
                 if (stroke is RasterStroke rasterStroke)
                 {
                     LoadStrokeConstants(stroke);
 
                     rcStroke = m_renderingContext.MeasureParticleStrokeBounds(rasterStroke.Particles, m_strokeContants, rasterStroke.ParticleSpacing);
-
                 }
                 else if (stroke is VectorStroke vectorStroke)
                 {
                     rcStroke = m_renderingContext.MeasurePolygonBounds(vectorStroke.m_polygon);
                 }
+
                 rcBounds.Union(rcStroke);
             }
+
             return rcBounds;
         }
 
@@ -468,12 +473,8 @@ namespace WacomInkDemoUWP
         {
             m_renderingContext = m_graphics.GetRenderingContext();
 
-            //m_win2DPainter.InitWin2DObjects(m_graphics, DisplayInformation.GetForCurrentView().LogicalDpi);
-
             CreateLayers();
             ClearLayers();
-
-            //m_win2DPainter.ClearWin2DLayer(m_transparentColor);
 
             StartProcessingInput();
         }
@@ -510,55 +511,10 @@ namespace WacomInkDemoUWP
 
             m_graphics.SetLogicalSize(m_newSize.Value);
 
-            //m_win2DPainter.CreateRenderTarget();
-
             CreateLayers();
 
             InvalidateSceneAndOverlay();
         }
-
-        //private void RedrawAllStrokesOld(IList<Stroke> strokes)
-        //{
-        //	if (m_fillInk)
-        //	{
-        //		/*	foreach (var stroke in Strokes)
-        //			{
-        //				// Draw current stroke
-        //				m_renderingContext.SetTarget(m_currentStrokeLayer);
-        //				m_renderingContext.ClearColor(m_transparentColor);
-        //				m_renderingContext.FillPolygon(stroke.m_polygon, stroke.m_color, Wacom.Ink.Rendering.BlendMode.SourceOver);
-        //
-        //				// Blend stroke to Scene Layer
-        //				m_renderingContext.SetTarget(m_sceneLayer);
-        //				m_renderingContext.DrawLayer(m_currentStrokeLayer, null, Wacom.Ink.Rendering.BlendMode.SourceOver);
-        //
-        //				// Blend Current Stroke to All Strokes Layer
-        //				m_renderingContext.SetTarget(m_allStrokesLayer);
-        //				m_renderingContext.DrawLayer(m_currentStrokeLayer, null, Wacom.Ink.Rendering.BlendMode.SourceOver);
-        //			}*/
-        //
-        //		m_renderingContext.SetTarget(m_allStrokesLayer);
-        //		m_renderingContext.ClearColor(m_transparentColor);
-        //
-        //		foreach (var stroke in strokes)
-        //		{
-        //			// Draw current stroke
-        //			m_renderingContext.FillPolygon(stroke.m_polygon, stroke.m_color, Wacom.Ink.Rendering.BlendMode.SourceOver);
-        //		}
-        //
-        //		// Blend strokes to Scene Layer
-        //		m_renderingContext.SetTarget(m_sceneLayer);
-        //		m_renderingContext.ClearColor(m_backgroundColor);
-        //		m_renderingContext.DrawLayer(m_allStrokesLayer, null, Wacom.Ink.Rendering.BlendMode.SourceOver);
-        //	}
-        //
-        //	// Clear CurrentStroke to prepare for next draw
-        //	m_renderingContext.SetTarget(m_currentStrokeLayer);
-        //	m_renderingContext.ClearColor(m_transparentColor);
-        //
-        //	// Present back-buffer to the screen
-        //	m_mustPresent = true;
-        //}
 
         private void LoadStrokeConstants(Stroke stroke)
         {
@@ -573,7 +529,7 @@ namespace WacomInkDemoUWP
             m_strokeContants.OffsetY = stroke.OffsetY;
         }
 
-        private void RedrawAllStrokes(IEnumerable<Stroke> strokes)
+        private void RedrawStrokes(IEnumerable<Stroke> strokes)
         {
             m_renderingContext.SetTarget(m_allStrokesLayer);
             m_renderingContext.ClearColor(Colors.Transparent);
@@ -596,7 +552,7 @@ namespace WacomInkDemoUWP
 
                     // Blend Current Stroke to All Strokes Layer
                     m_renderingContext.SetTarget(m_allStrokesLayer);
-                    m_renderingContext.DrawLayer(m_currentStrokeLayer, null, BlendMode.SourceOver);     // FIX: copy just the stroke rect?
+                    m_renderingContext.DrawLayer(m_currentStrokeLayer, null, BlendMode.SourceOver);
                 }
                 else if (stroke is VectorStroke vectorStroke)
                 {
@@ -619,32 +575,33 @@ namespace WacomInkDemoUWP
                 }
             }
 
-            // Blend stroke to Scene Layer
-            m_renderingContext.SetTarget(m_sceneLayer);
+			// Clear CurrentStroke to prepare for future drawing
+			m_renderingContext.SetTarget(m_currentStrokeLayer);
+			m_renderingContext.ClearColor(Colors.Transparent);
+
+			// Blend stroke to Scene Layer
+			m_renderingContext.SetTarget(m_sceneLayer);
             m_renderingContext.ClearColor(m_backgroundColor);
             m_renderingContext.DrawLayer(m_allStrokesLayer, null, BlendMode.SourceOver);
-
-            // Clear CurrentStroke to prepare for future drawing
-            m_renderingContext.SetTarget(m_currentStrokeLayer);
-            m_renderingContext.ClearColor(Colors.Transparent);
 
             // Present back buffer to the screen
             m_mustPresent = true;
         }
 
-
-        public void RedrawSelectedStrokes(IEnumerable<Stroke> strokes, Rect rcBounds, Matrix3x2? translation)
+        private void RedrawSelectedStrokes(IEnumerable<Stroke> strokes, Rect rcBounds, Vector2 translate)
         {
             m_renderingContext.SetTarget(m_translationLayer);
             m_renderingContext.ClearColor(Colors.Transparent);      // Clear whole layer
 
-            if (translation.HasValue)
+            if (translate != Vector2.Zero)
             {
-                m_renderingContext.TransformMatrix = translation.Value;
+				Matrix3x2 transform = Matrix3x2.CreateTranslation(translate);
+
+				m_renderingContext.TransformMatrix = transform;
 
                 Rect rcOffset = rcBounds;
-                rcOffset.X += translation.Value.Translation.X;
-                rcOffset.Y += translation.Value.Translation.Y;
+                rcOffset.X += translate.X;
+                rcOffset.Y += translate.Y;
                 m_renderingContext.SetClipRect(rcOffset);
             }
             else
@@ -652,7 +609,7 @@ namespace WacomInkDemoUWP
                 m_renderingContext.SetClipRect(rcBounds);
             }
 
-            m_renderingContext.ClearColor(Color.FromArgb(27, 0, 0, 0)); // Clear bounding rect to back semi-transparent 
+            m_renderingContext.ClearColor(Color.FromArgb(27, 0, 0, 0)); // Clear bounding rect to black semi-transparent 
 
             foreach (Stroke stroke in strokes)
             {
@@ -691,19 +648,28 @@ namespace WacomInkDemoUWP
             m_prelimPathLayer = m_graphics.CreateLayer(size, scale);
             m_sceneLayer = m_graphics.CreateLayer(size, scale);
             m_translationLayer = Graphics.CreateLayer(size, scale);
-            //m_win2DGraphicsLayer = m_win2DPainter.CreateLayer();
         }
 
         private void DisposeLayers()
         {
-            Utils.SafeDispose(m_allStrokesLayer);
-            Utils.SafeDispose(m_backBufferLayer);
-            Utils.SafeDispose(m_currentStrokeLayer);
-            Utils.SafeDispose(m_prelimPathLayer);
-            Utils.SafeDispose(m_sceneLayer);
-            Utils.SafeDispose(m_translationLayer);
-            //Utils.SafeDispose(m_win2DGraphicsLayer);
-        }
+            m_allStrokesLayer?.Dispose();
+            m_allStrokesLayer = null;
+
+			m_backBufferLayer?.Dispose();
+            m_backBufferLayer = null;
+
+			m_currentStrokeLayer?.Dispose();
+			m_currentStrokeLayer = null;
+
+			m_prelimPathLayer?.Dispose();
+			m_prelimPathLayer = null;
+
+			m_sceneLayer?.Dispose();
+            m_sceneLayer = null;
+
+			m_translationLayer?.Dispose();
+            m_translationLayer = null;
+		}
 
         #endregion
 

@@ -2,25 +2,11 @@
 
 namespace WacomInkDemoUWP
 {
-    public abstract class DrawStrokeOperation : UserOperation
+    abstract class DrawStrokeOperation : UserOperation
     {
-        #region Fields
+		#region Constructors
 
-        protected string m_tag = null;
-        protected bool m_keepStroke = true;
-        protected bool m_ended = false;
-
-        #endregion
-
-        #region Properties
-
-        //public bool UseRandomInkColor { get; set; }
-
-        #endregion
-
-        #region Constructors
-
-        public DrawStrokeOperation(InkPanelController controller) : base(controller)
+		public DrawStrokeOperation(InkPanelController controller) : base(controller)
         {
         }
 

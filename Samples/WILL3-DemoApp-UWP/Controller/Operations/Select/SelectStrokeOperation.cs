@@ -4,7 +4,7 @@ using Windows.UI.Core;
 
 namespace WacomInkDemoUWP
 {
-    public abstract class SelectStrokeOperation : DrawVectorStrokeOperation
+    abstract class SelectStrokeOperation : DrawVectorStrokeOperation
     {
         protected List<Vector2> m_selectorPath;
 
@@ -33,10 +33,11 @@ namespace WacomInkDemoUWP
             base.OnPointerMoved(args);
         }
 
-        protected void AddPointToSelectorPath(Windows.UI.Input.PointerPoint pointerPoint)
+		protected void AddPointToSelectorPath(Windows.UI.Input.PointerPoint pointerPoint)
         {
             Vector2 pp = pointerPoint.Position.ToVector2();
-            m_selectorPath.Add(m_controller.ViewTransformToModel(pp));
+            m_selectorPath.Add(pp);
         }
-    }
+
+	}
 }

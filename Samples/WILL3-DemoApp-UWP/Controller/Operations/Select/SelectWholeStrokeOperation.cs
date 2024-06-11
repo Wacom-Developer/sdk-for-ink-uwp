@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Wacom.Ink;
 using Wacom.Ink.Manipulations;
@@ -7,7 +8,7 @@ using Windows.UI.Core;
 
 namespace WacomInkDemoUWP
 {
-    public class SelectWholeStrokeOperation : SelectStrokeOperation
+    class SelectWholeStrokeOperation : SelectStrokeOperation
     {
         #region Constructors
 
@@ -28,11 +29,18 @@ namespace WacomInkDemoUWP
         {
             SelectionContours selection = SelectionContours.FromPath(m_selectorPath);
 
-            //m_controller.ViewDrawSelectorOverlay(selection.Contours, true);
-
             PerformSelectOperation(selection);
 
-            m_selectorPath = null;
+			if (m_controller.Selection.Count > 0)
+			{
+				m_controller.CurrentOperation = m_controller.MoveSelectedStrokesOp;
+			}
+			else
+			{
+				m_controller.CurrentOperation = m_controller.IdleOp;
+			}
+
+			m_selectorPath = null;
 
             // Set redraw flags
             m_controller.ViewInvalidateSceneAndOverlay();
@@ -42,23 +50,20 @@ namespace WacomInkDemoUWP
 
         public void PerformSelectOperation(SelectionContours selection)
         {
-            //m_controller.ModelClearCustomShapes();
-
             SelectWholeStrokeManipulation selector = m_controller.CreateSelectWholeStrokeOperation();
 
             selector.SelectQuery(selection);
 
-            ProcessSelectWholeStrokeResult(selector.Result);
-        }
+            // Process the result of the select query
+			foreach (Stroke stroke in selector.Result)
+			{
+				// Selection of raster strokes is not supported, only vector strokes are expected in the result
+				Debug.Assert(stroke is VectorStroke);
 
-        public void ProcessSelectWholeStrokeResult(HashSet<IInkStroke> result)
-        {
-            // Translation (moving) raster strokes is not supported so only select vector strokes
-            foreach (Stroke stroke in result.Where(s => s is VectorStroke))
-            {
-                m_controller.ModelSelectStroke(stroke.Id);
-            }
-            m_controller.MeasureSelectedStrokes();
-        }
+				m_controller.Selection.Add(stroke.Id);
+			}
+
+			m_controller.MeasureSelectedStrokes();
+		}
     }
 }

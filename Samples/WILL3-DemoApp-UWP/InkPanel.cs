@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Wacom.Ink.Serialization.Model;
+using Windows.UI;
+using Windows.UI.Core;
 using Windows.UI.Xaml.Controls;
 
 namespace WacomInkDemoUWP
@@ -18,15 +19,17 @@ namespace WacomInkDemoUWP
 
         #region Properties
 
-        public InkPanelModel Model { get; } = new InkPanelModel();
-        public InkPanelView View { get; } = new InkPanelView();
-        public InkPanelController Controller { get; private set; } = null;
+        InkPanelModel Model { get; } = new InkPanelModel();
+        InkPanelView View { get; } = new InkPanelView();
+        InkPanelController Controller { get; } = null;
 
-        #endregion
+		#endregion
 
-        #region Public Interface
+		#region Public Interface
 
-        public void Initialize(SwapChainPanel swapChain)
+		public int StrokesCount => Model.Strokes.Count;
+
+		public void Initialize(SwapChainPanel swapChain)
         {
             View.Graphics.GraphicsReady += Controller.LoadRasterToolsTextures;
             View.InitializeGraphics(swapChain);
@@ -35,7 +38,7 @@ namespace WacomInkDemoUWP
 
         public void Clear()
         {
-            Controller.Clear();
+            _ = View.Dispatcher?.RunAsync(CoreDispatcherPriority.Normal, () => Controller.Clear());
         }
 
         public void Dispose()
@@ -43,21 +46,29 @@ namespace WacomInkDemoUWP
             Controller.Dispose();
         }
 
-        public double RebuildAndRepaintStrokesAndOverlay()
+        public void SetOperationMode(OperationMode mode)
         {
-            return Controller.RebuildAndRepaintStrokesAndOverlay();
+            Controller.OperationMode = mode;
         }
 
-        public async Task LoadStrokesFromModel(InkModel inkModel)
+        public void SetInkColor(Color color)
         {
-            Clear();    // Clear existing strokes, including any selection
+			Controller.DrawVectorStrokeOp.Color = color;
+			Controller.DrawRasterStrokeOp.Color = color;
+		}
 
-            await Model.LoadStrokesFromModel(inkModel, View.Graphics);
-
-            foreach (var stroke in Model.Strokes)
+        public void LoadStrokesFromModel(Wacom.Ink.Serialization.Model.InkModel inkModel)
+        {
+            _ = View.Dispatcher?.RunAsync(CoreDispatcherPriority.Normal, async () =>
             {
-                stroke.RebuildCache(Controller.UseNewInterpolator);
-            }
+                Controller.Clear();
+
+                await Model.LoadStrokesFromModel(inkModel, View.Graphics);
+
+				Model.RebuildStrokesCache();
+
+				View.TriggerRedrawSceneAndOverlay();
+			});
         }
 
         public bool SetVectorTool(string toolName)
@@ -126,7 +137,15 @@ namespace WacomInkDemoUWP
             return true;
         }
 
-        #endregion
+		internal async Task<Wacom.Ink.Serialization.Model.InkModel> CreateUniversalInkModelAsync()
+		{
+			var inkModel = Model.BuildUniversalInkModelFromCanvasStrokes();
 
-    }
+			await Model.BuildUIMBrushesFromAppBrushes(inkModel);
+
+            return inkModel;
+		}
+
+		#endregion
+	}
 }
