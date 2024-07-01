@@ -10,9 +10,9 @@ A sample application has been provided for the Universal Windows Platform (UWP).
 Download the SDK from https://developer.wacom.com/developer-dashboard
 
 * Login using your Wacom ID
-* Select **Downloads for ink**
-* Download **WILL SDK for ink for Windows 10 (UWP/WPF) (version 3.0)**
-* Accept the End User License Agreement to use the SDK
+* Navigate to **Downloads for ink**
+* Select **More info** on **WILL SDK for ink for Windows**
+* Accept the End User License Agreement and follow the NuGet installation instructions to use the SDK
 
 The downloaded Zip file contains the SDK.
 
